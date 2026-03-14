@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { 
   Phone, Shield, HeartPulse, MapPin, AlertCircle, 
@@ -8,10 +8,12 @@ import {
   Settings, Cloud, Wind, Waves, RefreshCw, X, CheckCircle2,
   Droplets, Thermometer, Sun, CloudSun, CloudRain, 
   CloudLightning, CloudFog, CloudDrizzle, ExternalLink,
-  Smartphone, Download, Search, Plus, MessageSquare, Trash2
+  Smartphone, Download, Search, Plus, MessageSquare, Trash2,
+  Instagram, Linkedin, Github, Mail, Package, MoreHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
+import ReactMarkdown from 'react-markdown';
 import { db, auth } from '@/lib/firebase';
 import { 
   collection, addDoc, onSnapshot, query, 
@@ -79,6 +81,10 @@ const STRINGS = {
   nav4: { id: 'Peta', en: 'Map' },
   nav5: { id: 'Info', en: 'Info' },
   nav6: { id: 'Hilang/Temu', en: 'Lost/Found' },
+  tab_info: { id: 'Informasi & Pengaturan', en: 'Info & Settings' },
+  lbl_welcome: { id: 'Selamat Datang di Gili T', en: 'Welcome to Gili T' },
+  lbl_cur_weather: { id: 'Cuaca Saat Ini', en: 'Current Weather' },
+  lbl_recent_lf: { id: 'Laporan Terbaru', en: 'Recent Reports' },
   lf_title: { id: 'Barang Hilang & Temuan', en: 'Lost & Found Items' },
   lf_lost: { id: 'HILANG', en: 'LOST' },
   lf_found: { id: 'TEMUAN', en: 'FOUND' },
@@ -124,6 +130,10 @@ const STRINGS = {
   lbl_about: { id: 'Tentang', en: 'About' },
   lbl_rules: { id: 'Aturan Gili', en: 'Gili Rules' },
   lbl_links: { id: 'Tautan Berguna', en: 'Useful Links' },
+  lbl_back: { id: 'Kembali', en: 'Back' },
+  lbl_settings: { id: 'Pengaturan & Bahasa', en: 'Settings & Language' },
+  lbl_peta: { id: 'Peta Pulau', en: 'Island Map' },
+  lbl_lang: { id: 'Pilih Bahasa', en: 'Select Language' },
   rule1: { id: '🚫 Tanpa Kendaraan Bermotor', en: '🚫 No Motorized Vehicles' },
   rule2: { id: '👕 Berpakaian Sopan di Desa', en: '👕 Dress Modestly in Village' },
   rule3: { id: '🐢 Jangan Sentuh Penyu', en: '🐢 Do Not Touch Turtles' },
@@ -139,6 +149,12 @@ const STRINGS = {
   ver: { id: 'Versi 2.2 – Ultra Comprehensive', en: 'Version 2.2 – Ultra Comprehensive' },
   mission: { id: 'Dibuat untuk keselamatan Gili · Gratis selamanya', en: 'Built for Gili safety · Free forever' },
   footer: { id: 'Untuk wisatawan & warga lokal · Gili Trawangan, NTB', en: 'Built for tourists & locals · Gili Trawangan, NTB' },
+  ai_btn: { id: 'Tanya AI Asisten', en: 'Ask AI Assistant' },
+  ai_title: { id: 'Asisten P3K AI', en: 'AI First Aid Assistant' },
+  ai_placeholder: { id: 'Jelaskan gejala atau situasi darurat...', en: 'Describe symptoms or emergency...' },
+  ai_disclaimer: { id: 'AI dapat membuat kesalahan. Selalu hubungi medis untuk darurat.', en: 'AI can make mistakes. Always call medical for emergencies.' },
+  ai_send: { id: 'Kirim', en: 'Send' },
+  ai_back: { id: 'Kembali ke Panduan', en: 'Back to Guides' },
   about_desc: { 
     id: 'GiliGuard adalah aplikasi pendamping keselamatan digital yang dirancang khusus untuk wisatawan dan warga lokal di Gili Trawangan. Fokus utama kami adalah mempercepat respon darurat di pulau yang tidak memiliki kendaraan bermotor ini.', 
     en: 'GiliGuard is a digital safety companion app designed specifically for tourists and locals on Gili Trawangan. Our main focus is to accelerate emergency response on this motor-free island.' 
@@ -157,6 +173,7 @@ const STRINGS = {
   legal_terms_desc: { id: 'GiliGuard adalah alat bantu informasi. Dalam keadaan darurat nyata, selalu prioritaskan instruksi dari petugas berwenang di lapangan.', en: 'GiliGuard is an information tool. In real emergencies, always prioritize instructions from authorities on the ground.' },
   legal_privacy_title: { id: 'Kebijakan Privasi', en: 'Privacy Policy' },
   legal_privacy_desc: { id: 'Kami menghargai privasi Anda. Data login Google hanya digunakan untuk identifikasi laporan Lost & Found. Lokasi GPS Anda hanya diproses secara lokal untuk membantu Anda memberikan informasi ke operator 112.', en: 'We value your privacy. Google login data is only used for Lost & Found identification. Your GPS location is processed locally to help you provide info to 112 operators.' },
+  dev_contact: { id: 'Hubungi Saya', en: 'Contact Me' },
 };
 
 const P3K_GUIDES = [
@@ -418,6 +435,9 @@ const WeatherCard = ({ lang, weather, loading, onRefresh }: { lang: Lang, weathe
 export default function GiliGuard() {
   const [lang, setLang] = useState<Lang>('id');
   const [activePage, setActivePage] = useState<Page>('beranda');
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [mounted, setMounted] = useState(false);
+  const [infoSubPage, setInfoSubPage] = useState<string | null>(null);
   const [showSOSModal, setShowSOSModal] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isSOSSent, setIsSOSSent] = useState(false);
@@ -426,11 +446,27 @@ export default function GiliGuard() {
   const [history, setHistory] = useState<{ time: string, coords: string }[]>([]);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [p3kSearch, setP3kSearch] = useState('');
+
+  // AI Chat state
+  const [showAiChat, setShowAiChat] = useState(false);
+  const [aiMessages, setAiMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
+  const [aiInput, setAiInput] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showAiChat) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [aiMessages, showAiChat, isAiLoading]);
 
   // Lost & Found state
   const [lfItems, setLfItems] = useState<LostFoundItem[]>([]);
   const [showLfForm, setShowLfForm] = useState(false);
   const [lfLoading, setLfLoading] = useState(true);
+  const [lfFilter, setLfFilter] = useState<'all' | 'lost' | 'found'>('all');
+  const [lfSearch, setLfSearch] = useState('');
   const [user, setUser] = useState<User | null>(null);
   const [newLf, setNewLf] = useState({
     type: 'lost' as 'lost' | 'found',
@@ -442,10 +478,16 @@ export default function GiliGuard() {
 
   // Auth setup
   useEffect(() => {
+    setMounted(true);
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
     });
     return unsub;
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
   }, []);
 
   const handleGoogleLogin = async () => {
@@ -668,7 +710,42 @@ export default function GiliGuard() {
     return `${m}:${s}`;
   };
 
-  const t = (key: keyof typeof STRINGS) => STRINGS[key][lang];
+  const t = (key: keyof typeof STRINGS) => {
+    if (!STRINGS[key]) {
+      console.warn(`Missing translation key: ${key}`);
+      return key as string;
+    }
+    return STRINGS[key][lang];
+  };
+
+  const handleAiSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiInput.trim() || isAiLoading) return;
+
+    const userText = aiInput.trim();
+    setAiInput('');
+    setAiMessages(prev => [...prev, { role: 'user', text: userText }]);
+    setIsAiLoading(true);
+
+    try {
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
+      
+      const prompt = `You are a first aid assistant for Gili Trawangan. The user is asking for first aid advice. Provide clear, concise, and safe first aid instructions. Important context: Gili Trawangan has no motorized vehicles, only horse carts (cidomo) and bicycles. There are local clinics but for serious emergencies, evacuation to Lombok by speedboat is required. Always advise them to contact local medical services (like Prima Medika or Blue Island Medical) or call 112 for severe emergencies. Respond in ${lang === 'id' ? 'Indonesian' : 'English'}.\n\nUser: ${userText}`;
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+      });
+
+      setAiMessages(prev => [...prev, { role: 'model', text: response.text || 'Sorry, I could not generate a response.' }]);
+    } catch (error) {
+      console.error('AI Error:', error);
+      setAiMessages(prev => [...prev, { role: 'model', text: lang === 'id' ? 'Maaf, terjadi kesalahan saat menghubungi AI.' : 'Sorry, an error occurred while contacting AI.' }]);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   return (
     <div className="max-w-md mx-auto h-[100dvh] bg-[#080f1e] text-[#ddeeff] flex flex-col relative overflow-hidden">
@@ -724,10 +801,56 @@ export default function GiliGuard() {
           
           {/* PAGE: BERANDA */}
           {activePage === 'beranda' && (
-            <motion.div key="beranda" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-              <WeatherCard lang={lang} weather={weather} loading={weatherLoading} onRefresh={fetchWeather} />
+            <motion.div key="beranda" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
               
-              <div className="flex flex-col items-center gap-4 py-8 mb-10 relative">
+              {/* Dashboard Header */}
+              <div className="flex items-center justify-between px-1">
+                <div>
+                  <div className="text-[10px] text-[#3d6080] font-black uppercase tracking-[0.2em] mb-1">{t('lbl_welcome')}</div>
+                  <div className="text-2xl font-black text-white tracking-tighter">
+                    {mounted ? currentTime.toLocaleTimeString(lang === 'id' ? 'id-ID' : 'en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                    <span className="text-xs font-bold text-[#7a9ab8] ml-2 tracking-normal">
+                      {mounted ? currentTime.toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' }) : '---'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#00e5b0]/10 border border-[#00e5b0]/20">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#00e5b0] animate-pulse" />
+                    <span className="text-[9px] font-black text-[#00e5b0] uppercase tracking-widest">{lang === 'id' ? 'SISTEM AMAN' : 'SYSTEM SECURE'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Weather Widget (Compact) */}
+              <div 
+                onClick={() => setActivePage('info')} // Or a dedicated weather page if we had one
+                className="bg-gradient-to-br from-[#121f35] to-[#0d1829] border border-white/5 rounded-[2rem] p-5 flex items-center justify-between shadow-xl group cursor-pointer hover:border-[#3d9bff]/30 transition-all"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center">
+                    {weather ? (
+                      <div className="text-2xl">
+                        {weather.weatherCode === 0 ? '☀️' : weather.weatherCode < 3 ? '⛅' : weather.weatherCode < 50 ? '☁️' : '🌧️'}
+                      </div>
+                    ) : (
+                      <RefreshCw className="w-5 h-5 text-[#3d6080] animate-spin" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-[#3d6080] font-black uppercase tracking-widest mb-0.5">{t('lbl_cur_weather')}</div>
+                    <div className="text-sm font-bold text-white">
+                      {weather ? `${Math.round(weather.temp)}°C • ${WEATHER_DESCRIPTIONS[weather.weatherCode]?.[lang] || '...'}` : 'Loading...'}
+                    </div>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-[#3d9bff]/10 transition-colors">
+                  <Navigation className="w-4 h-4 text-[#3d6080] group-hover:text-[#3d9bff] rotate-90" />
+                </div>
+              </div>
+              
+              {/* SOS Button Section */}
+              <div className="flex flex-col items-center gap-4 py-4 relative">
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#ff3c3c]/5 to-transparent pointer-events-none" />
                 <div className="w-48 h-48 rounded-full bg-[#ff3c3c]/5 flex items-center justify-center relative">
                   <motion.div 
@@ -742,7 +865,7 @@ export default function GiliGuard() {
                   />
                   <button 
                     onClick={() => setShowSOSModal(true)}
-                    className="w-36 h-36 rounded-full bg-gradient-to-br from-[#ff6060] via-[#ff3c3c] to-[#c81414] shadow-[0_0_60px_rgba(255,60,60,0.5)] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform z-10 border-4 border-white/10"
+                    className="w-36 h-36 rounded-full bg-gradient-to-br from-[#ff6060] via-[#ff3c3c] to-[#c81414] shadow-[0_0_60px_rgba(255,60,60,0.4)] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform z-10 border-4 border-white/10 animate-glow"
                   >
                     <div className="text-4xl font-black text-white tracking-widest drop-shadow-2xl">SOS</div>
                     <div className="text-[10px] text-white/80 font-black uppercase tracking-[0.2em]">{t('sos_sub')}</div>
@@ -751,85 +874,109 @@ export default function GiliGuard() {
                 <div className="text-[10px] text-[#3d6080] font-black uppercase tracking-widest text-center max-w-[200px] leading-relaxed opacity-60">{t('sos_hint')}</div>
               </div>
 
-              {/* Community Section */}
-              <div className="mb-10">
+              {/* Quick Actions Grid */}
+              <div>
                 <div className="text-[11px] font-black text-[#3d6080] uppercase tracking-[0.2em] mb-4 px-1 font-mono flex items-center gap-2">
                   <div className="w-8 h-[1px] bg-[#3d6080]/30" />
-                  {lang === 'id' ? 'KOMUNITAS' : 'COMMUNITY'}
+                  {t('lbl_quick')}
                 </div>
-                <button 
-                  onClick={() => setActivePage('lostfound')}
-                  className="w-full bg-gradient-to-br from-[#121f35] to-[#0d1829] border border-white/5 rounded-[2rem] p-5 flex items-center gap-5 hover:border-[#3d9bff]/30 transition-all active:scale-[0.98] group shadow-xl"
-                >
-                  <div className="w-14 h-14 bg-[#3d9bff]/10 rounded-2xl flex items-center justify-center text-[#3d9bff] group-hover:scale-110 transition-transform">
-                    <Search className="w-7 h-7" />
-                  </div>
-                  <div className="text-left flex-1">
-                    <div className="text-sm font-black text-white uppercase tracking-tight mb-1">{t('lf_title')}</div>
-                    <p className="text-[11px] text-[#7a9ab8] leading-tight font-medium">{lang === 'id' ? 'Cari atau lapor barang hilang/temuan di pulau.' : 'Search or report lost/found items on the island.'}</p>
-                  </div>
-                  <div className="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center">
-                    <Navigation className="w-4 h-4 text-[#3d9bff] rotate-90" />
-                  </div>
-                </button>
-              </div>
-
-              <div className="text-[11px] font-black text-[#3d6080] uppercase tracking-[0.2em] mb-4 px-1 font-mono flex items-center gap-2">
-                <div className="w-8 h-[1px] bg-[#3d6080]/30" />
-                {t('lbl_quick')}
-              </div>
-              <div className="grid grid-cols-3 gap-3 mb-10">
-                {[
-                  { icon: '📞', label: t('q1'), page: 'kontak', color: 'from-blue-500/20 to-blue-600/5' },
-                  { icon: '🩹', label: t('q2'), page: 'p3k', color: 'from-emerald-500/20 to-emerald-600/5' },
-                  { icon: '📍', label: t('q3'), page: 'peta', color: 'from-orange-500/20 to-orange-600/5' },
-                  { icon: '🚑', label: t('q4'), call: '119', color: 'from-red-500/20 to-red-600/5' },
-                  { icon: '👮', label: t('q5'), call: '110', color: 'from-indigo-500/20 to-indigo-600/5' },
-                  { icon: '⚓', label: t('q6'), call: '115', color: 'from-cyan-500/20 to-cyan-600/5' },
-                ].map((item, i) => (
-                  <motion.button 
-                    key={i}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => item.page ? setActivePage(item.page as Page) : window.location.href = `tel:${item.call}`}
-                    className={cn("bg-gradient-to-br border border-white/5 rounded-3xl p-4 flex flex-col items-center gap-3 transition-all shadow-lg", item.color)}
-                  >
-                    <div className="text-2xl drop-shadow-md">{item.icon}</div>
-                    <div className="text-[10px] font-black text-[#7a9ab8] text-center leading-tight uppercase tracking-tight">{item.label}</div>
-                  </motion.button>
-                ))}
-              </div>
-
-              <div className="text-[11px] font-black text-[#3d6080] uppercase tracking-[0.2em] mb-4 px-1 font-mono flex items-center gap-2">
-                <div className="w-8 h-[1px] bg-[#3d6080]/30" />
-                {t('lbl_tips')}
-              </div>
-              <div className="bg-[#121f35]/50 border border-white/5 rounded-[2rem] overflow-hidden mb-10 shadow-xl">
-                <div className="p-4 bg-white/5 flex items-center gap-3 border-b border-white/5">
-                  <div className="p-2 bg-[#ffb830]/10 rounded-xl">
-                    <AlertCircle className="w-4 h-4 text-[#ffb830]" />
-                  </div>
-                  <div className="text-xs font-black uppercase tracking-wider text-white">{t('tips_title')}</div>
-                </div>
-                <div className="divide-y divide-white/5">
-                  {getDynamicTips().map((tip, i) => (
-                    <motion.div 
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      key={i} 
-                      className="p-4 flex items-start gap-4 hover:bg-white/[0.02] transition-colors"
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { icon: '📞', label: t('q1'), page: 'kontak', color: 'from-blue-500/20 to-blue-600/5' },
+                    { icon: '🩹', label: t('q2'), page: 'p3k', color: 'from-emerald-500/20 to-emerald-600/5' },
+                    { icon: '📍', label: t('q3'), page: 'peta', color: 'from-orange-500/20 to-orange-600/5' },
+                    { icon: '🚑', label: t('q4'), call: '119', color: 'from-red-500/20 to-red-600/5' },
+                    { icon: '👮', label: t('q5'), call: '110', color: 'from-indigo-500/20 to-indigo-600/5' },
+                    { icon: '⚓', label: t('q6'), call: '115', color: 'from-cyan-500/20 to-cyan-600/5' },
+                  ].map((item, i) => (
+                    <motion.button 
+                      key={i}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => item.page ? setActivePage(item.page as Page) : window.location.href = `tel:${item.call}`}
+                      className={cn("bg-gradient-to-br border border-white/5 rounded-3xl p-4 flex flex-col items-center gap-3 transition-all shadow-lg hover:border-white/10", item.color)}
                     >
-                      <div className="w-2 h-2 rounded-full bg-[#00e5b0] mt-1.5 shrink-0 shadow-[0_0_8px_rgba(0,229,176,0.5)]" />
-                      <div className="text-[12px] text-[#7a9ab8] leading-relaxed font-medium">{tip}</div>
-                    </motion.div>
+                      <div className="text-2xl drop-shadow-md">{item.icon}</div>
+                      <div className="text-[10px] font-black text-[#7a9ab8] text-center leading-tight uppercase tracking-tight">{item.label}</div>
+                    </motion.button>
                   ))}
+                </div>
+              </div>
+
+              {/* Recent Reports Preview */}
+              <div>
+                <div className="text-[11px] font-black text-[#3d6080] uppercase tracking-[0.2em] mb-4 px-1 font-mono flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-[1px] bg-[#3d6080]/30" />
+                    {t('lbl_recent_lf')}
+                  </div>
+                  <button onClick={() => setActivePage('lostfound')} className="text-[9px] text-[#3d9bff] font-bold hover:underline">
+                    {lang === 'id' ? 'LIHAT SEMUA' : 'VIEW ALL'}
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {lfItems.length > 0 ? (
+                    lfItems.slice(0, 2).map((item) => (
+                      <div key={item.id} className="bg-[#121f35]/40 border border-white/5 rounded-2xl p-4 flex items-center gap-4">
+                        <div className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center text-lg",
+                          item.type === 'lost' ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-500"
+                        )}>
+                          {item.type === 'lost' ? '❓' : '🎁'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-white truncate uppercase tracking-tight">{item.title}</div>
+                          <div className="text-[10px] text-[#7a9ab8] truncate">{item.location}</div>
+                        </div>
+                        <div className={cn(
+                          "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest",
+                          item.type === 'lost' ? "bg-red-500/20 text-red-400" : "bg-emerald-500/20 text-emerald-400"
+                        )}>
+                          {item.type === 'lost' ? t('lf_lost') : t('lf_found')}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="bg-[#121f35]/20 border border-dashed border-white/10 rounded-2xl p-6 text-center">
+                      <div className="text-[10px] text-[#3d6080] font-bold uppercase tracking-widest">{t('lf_empty')}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Safety Tips Section */}
+              <div>
+                <div className="text-[11px] font-black text-[#3d6080] uppercase tracking-[0.2em] mb-4 px-1 font-mono flex items-center gap-2">
+                  <div className="w-8 h-[1px] bg-[#3d6080]/30" />
+                  {t('lbl_tips')}
+                </div>
+                <div className="bg-[#121f35]/50 border border-white/5 rounded-[2rem] overflow-hidden shadow-xl">
+                  <div className="p-4 bg-white/5 flex items-center gap-3 border-b border-white/5">
+                    <div className="p-2 bg-[#ffb830]/10 rounded-xl">
+                      <AlertCircle className="w-4 h-4 text-[#ffb830]" />
+                    </div>
+                    <div className="text-xs font-black uppercase tracking-wider text-white">{t('tips_title')}</div>
+                  </div>
+                  <div className="divide-y divide-white/5">
+                    {getDynamicTips().slice(0, 3).map((tip, i) => (
+                      <motion.div 
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        key={i} 
+                        className="p-4 flex items-start gap-4 hover:bg-white/[0.02] transition-colors"
+                      >
+                        <div className="w-2 h-2 rounded-full bg-[#00e5b0] mt-1.5 shrink-0 shadow-[0_0_8px_rgba(0,229,176,0.5)]" />
+                        <div className="text-[12px] text-[#7a9ab8] leading-relaxed font-medium">{tip}</div>
+                      </motion.div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
               {deferredPrompt && (
                 <button 
                   onClick={handleInstall}
-                  className="w-full bg-gradient-to-r from-[#00e5b0] to-[#3d9bff] p-4 rounded-2xl text-white font-black text-sm shadow-xl shadow-emerald-900/20 mb-6 flex items-center justify-center gap-2"
+                  className="w-full bg-gradient-to-r from-[#00e5b0] to-[#3d9bff] p-4 rounded-2xl text-white font-black text-sm shadow-xl shadow-emerald-900/20 flex items-center justify-center gap-2"
                 >
                   📥 {lang === 'id' ? 'INSTALL APLIKASI' : 'INSTALL APP'}
                 </button>
@@ -839,19 +986,51 @@ export default function GiliGuard() {
 
           {/* PAGE: KONTAK */}
           {activePage === 'kontak' && (
-            <motion.div key="kontak" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-              <div className="bg-[#ff3c3c]/10 border border-[#ff3c3c]/20 rounded-2xl p-4 flex items-center justify-between mb-6">
-                <div>
-                  <div className="text-2xl font-black text-[#ff3c3c] font-mono">112</div>
-                  <div className="text-[10px] text-[#7a9ab8]">{t('emg_txt')}</div>
+            <motion.div key="kontak" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+              <div className="bg-gradient-to-br from-[#ff3c3c] to-[#ff6b6b] rounded-[2rem] p-6 shadow-2xl shadow-red-900/40 relative overflow-hidden">
+                <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                      <Phone className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em]">{lang === 'id' ? 'DARURAT NASIONAL' : 'NATIONAL EMERGENCY'}</div>
+                  </div>
+                  <div className="text-5xl font-black text-white mb-2 tracking-tighter">112</div>
+                  <p className="text-xs text-white/80 font-medium leading-relaxed mb-6">{t('emg_txt')}</p>
+                  <button 
+                    onClick={() => window.location.href = 'tel:112'}
+                    className="w-full bg-white text-[#ff3c3c] py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+                  >
+                    {lang === 'id' ? 'HUBUNGI SEKARANG' : 'CALL NOW'}
+                  </button>
                 </div>
-                <button 
-                  onClick={() => window.location.href = 'tel:112'}
-                  className="bg-[#ff3c3c] text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-[#ff3c3c]/20"
-                >📞 112</button>
               </div>
 
               <div className="space-y-6">
+                {/* Nearby Medical Quick View */}
+                <div>
+                  <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-4 px-1 font-mono flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-[#ff3c3c] animate-pulse" />
+                    {lang === 'id' ? 'MEDIS TERDEKAT' : 'NEARBY MEDICAL'}
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                    {EMERGENCY_CONTACTS.filter(c => c.type === 'med').slice(0, 3).map((c, i) => (
+                      <button 
+                        key={i}
+                        onClick={() => window.location.href = `tel:${c.num}`}
+                        className="bg-[#121f35] border border-white/5 rounded-2xl p-4 min-w-[160px] flex flex-col items-start gap-3 active:scale-95 transition-all"
+                      >
+                        <div className="text-2xl">{c.icon}</div>
+                        <div className="text-left">
+                          <div className="text-[11px] font-black text-white uppercase tracking-tight truncate w-32">{c.name}</div>
+                          <div className="text-[9px] text-[#7a9ab8] font-bold">{c.num}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Medical */}
                 <div>
                   <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-2 px-1 font-mono">🏥 {t('lbl_med')}</div>
@@ -927,7 +1106,7 @@ export default function GiliGuard() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 mb-6">
                 <div className="bg-[#121f35] border border-white/5 rounded-2xl p-4">
                   <div className="text-[10px] text-[#3d6080] font-bold uppercase mb-2 tracking-widest">{lang === 'id' ? 'Titik Evakuasi' : 'Evacuation Point'}</div>
                   <div className="text-xs font-black text-white">{lang === 'id' ? 'Pelabuhan Utama' : 'Main Harbor'}</div>
@@ -939,41 +1118,163 @@ export default function GiliGuard() {
                   <div className="text-[10px] text-[#7a9ab8] mt-1">{lang === 'id' ? 'Dekat Pasar Seni' : 'Near Art Market'}</div>
                 </div>
               </div>
+
+              <div className="space-y-3">
+                <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest px-1 font-mono">{lang === 'id' ? 'Fasilitas Terdekat' : 'Nearby Facilities'}</div>
+                {[
+                  { name: 'Gili Trawangan Harbor', type: 'Transport', dist: '200m', icon: '⚓' },
+                  { name: 'Warna Beach Club', type: 'Resto', dist: '450m', icon: '🍹' },
+                  { name: 'Villa Almarik', type: 'Hotel', dist: '1.2km', icon: '🏨' },
+                  { name: 'Blue Marlin Dive', type: 'Dive', dist: '300m', icon: '🤿' },
+                ].map((f, i) => (
+                  <div key={i} className="bg-[#121f35] border border-white/5 rounded-2xl p-4 flex items-center justify-between group active:scale-[0.98] transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-lg">{f.icon}</div>
+                      <div>
+                        <div className="text-xs font-black text-white uppercase tracking-tight">{f.name}</div>
+                        <div className="text-[10px] text-[#7a9ab8] font-bold">{f.type} • {f.dist}</div>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => window.open(`https://www.google.com/maps/search/${encodeURIComponent(f.name)}`, '_blank')}
+                      className="p-2 bg-white/5 rounded-lg text-[#3d9bff] group-hover:bg-[#3d9bff] group-hover:text-white transition-all"
+                    >
+                      <Navigation className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </motion.div>
           )}
 
           {/* PAGE: P3K */}
           {activePage === 'p3k' && (
-            <motion.div key="p3k" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-              <div className="space-y-3">
-                {P3K_GUIDES.map((guide) => (
-                  <div key={guide.id} className="bg-[#121f35] border border-white/5 rounded-2xl overflow-hidden">
-                    <div className="p-4 bg-white/5 flex items-center gap-3">
-                      <div className="text-2xl">{guide.icon}</div>
-                      <div>
-                        <div className="text-xs font-bold">{guide.title[lang]}</div>
-                        <div className="flex gap-1 mt-1">
-                          {guide.tags.map(tag => (
-                            <span key={tag} className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-[#7a9ab8]">{tag}</span>
-                          ))}
-                        </div>
-                      </div>
+            <motion.div key="p3k" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
+              {!showAiChat ? (
+                <>
+                  <div className="flex gap-2 mb-6">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#3d6080]" />
+                      <input 
+                        type="text"
+                        placeholder={lang === 'id' ? 'Cari panduan P3K...' : 'Search first aid guides...'}
+                        value={p3kSearch}
+                        onChange={(e) => setP3kSearch(e.target.value)}
+                        className="w-full bg-[#121f35] border border-white/5 rounded-2xl py-3 pl-11 pr-4 text-xs text-white placeholder-[#3d6080] focus:outline-none focus:border-[#3d9bff]/50 transition-all"
+                      />
                     </div>
-                    <div className="p-4 space-y-3">
-                      {guide.steps.map((step, i) => (
-                        <div key={step.id} className="flex gap-3">
-                          <div className="w-5 h-5 rounded-full bg-[#18284a] border border-white/10 flex items-center justify-center text-[10px] font-bold shrink-0">{i+1}</div>
-                          <div className="text-[11px] text-[#7a9ab8] leading-relaxed">{step.text[lang]}</div>
-                        </div>
-                      ))}
-                      <div className="bg-[#ffb830]/5 border border-[#ffb830]/20 rounded-xl p-3 text-[10px] text-[#ffb830] flex gap-2">
-                        <span>⚠️</span>
-                        {guide.warning[lang]}
-                      </div>
-                    </div>
+                    <button
+                      onClick={() => setShowAiChat(true)}
+                      className="bg-gradient-to-r from-[#3d9bff] to-[#00e5b0] text-white px-4 rounded-2xl flex items-center justify-center shadow-lg shadow-[#3d9bff]/20 hover:scale-105 transition-transform"
+                    >
+                      <MessageSquare className="w-5 h-5" />
+                    </button>
                   </div>
-                ))}
-              </div>
+
+                  <div className="space-y-3">
+                    {P3K_GUIDES.filter(guide => 
+                      guide.title[lang].toLowerCase().includes(p3kSearch.toLowerCase()) ||
+                      guide.tags.some(tag => tag.toLowerCase().includes(p3kSearch.toLowerCase()))
+                    ).map((guide) => (
+                      <div key={guide.id} className="bg-[#121f35] border border-white/5 rounded-2xl overflow-hidden">
+                        <div className="p-4 bg-white/5 flex items-center gap-3">
+                          <div className="text-2xl">{guide.icon}</div>
+                          <div>
+                            <div className="text-xs font-bold">{guide.title[lang]}</div>
+                            <div className="flex gap-1 mt-1">
+                              {guide.tags.map(tag => (
+                                <span key={tag} className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-[#7a9ab8]">{tag}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-4 space-y-3">
+                          {guide.steps.map((step, i) => (
+                            <div key={step.id} className="flex gap-3">
+                              <div className="w-5 h-5 rounded-full bg-[#18284a] border border-white/10 flex items-center justify-center text-[10px] font-bold shrink-0">{i+1}</div>
+                              <div className="text-[11px] text-[#7a9ab8] leading-relaxed">{step.text[lang]}</div>
+                            </div>
+                          ))}
+                          <div className="bg-[#ffb830]/5 border border-[#ffb830]/20 rounded-xl p-3 text-[10px] text-[#ffb830] flex gap-2">
+                            <span>⚠️</span>
+                            {guide.warning[lang]}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col h-[65vh] bg-[#121f35] border border-white/5 rounded-3xl overflow-hidden">
+                  <div className="p-4 bg-white/5 border-b border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#3d9bff] to-[#00e5b0] flex items-center justify-center">
+                        <HeartPulse className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white">{t('ai_title')}</div>
+                        <div className="text-[9px] text-[#7a9ab8]">{t('ai_disclaimer')}</div>
+                      </div>
+                    </div>
+                    <button onClick={() => setShowAiChat(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-[#7a9ab8] hover:text-white hover:bg-white/10 transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {aiMessages.length === 0 && (
+                      <div className="text-center text-[#7a9ab8] text-xs mt-10">
+                        {lang === 'id' ? 'Tanyakan apa saja tentang pertolongan pertama.' : 'Ask anything about first aid.'}
+                      </div>
+                    )}
+                    {aiMessages.map((msg, i) => (
+                      <div key={i} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
+                        <div className={cn(
+                          "max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed",
+                          msg.role === 'user' 
+                            ? "bg-[#3d9bff] text-white rounded-tr-sm" 
+                            : "bg-white/5 text-[#ddeeff] border border-white/5 rounded-tl-sm"
+                        )}>
+                          {msg.role === 'user' ? (
+                            msg.text
+                          ) : (
+                            <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-black/20 prose-pre:border prose-pre:border-white/10 prose-a:text-[#3d9bff]">
+                              <ReactMarkdown>{msg.text}</ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {isAiLoading && (
+                      <div className="flex justify-start">
+                        <div className="bg-white/5 border border-white/5 rounded-2xl rounded-tl-sm p-3 flex gap-1">
+                          <div className="w-1.5 h-1.5 bg-[#7a9ab8] rounded-full animate-bounce" />
+                          <div className="w-1.5 h-1.5 bg-[#7a9ab8] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                          <div className="w-1.5 h-1.5 bg-[#7a9ab8] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                        </div>
+                      </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+                  
+                  <form onSubmit={handleAiSubmit} className="p-3 bg-white/5 border-t border-white/5 flex gap-2">
+                    <input 
+                      type="text"
+                      value={aiInput}
+                      onChange={e => setAiInput(e.target.value)}
+                      placeholder={t('ai_placeholder')}
+                      className="flex-1 bg-[#080f1e] border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder-[#3d6080] focus:outline-none focus:border-[#3d9bff]/50"
+                    />
+                    <button 
+                      type="submit"
+                      disabled={!aiInput.trim() || isAiLoading}
+                      className="w-10 h-10 rounded-xl bg-[#3d9bff] text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Navigation className="w-4 h-4 rotate-90" />
+                    </button>
+                  </form>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -981,7 +1282,35 @@ export default function GiliGuard() {
           {activePage === 'lostfound' && (
             <motion.div key="lostfound" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-black text-white uppercase tracking-tight">{t('lf_title')}</h2>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setLfFilter('all')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all",
+                      lfFilter === 'all' ? "bg-[#3d9bff] text-white" : "bg-white/5 text-[#7a9ab8]"
+                    )}
+                  >
+                    {lang === 'id' ? 'SEMUA' : 'ALL'}
+                  </button>
+                  <button 
+                    onClick={() => setLfFilter('lost')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all",
+                      lfFilter === 'lost' ? "bg-[#ff3c3c] text-white" : "bg-white/5 text-[#7a9ab8]"
+                    )}
+                  >
+                    {t('lf_lost')}
+                  </button>
+                  <button 
+                    onClick={() => setLfFilter('found')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all",
+                      lfFilter === 'found' ? "bg-[#00e5b0] text-white" : "bg-white/5 text-[#7a9ab8]"
+                    )}
+                  >
+                    {t('lf_found')}
+                  </button>
+                </div>
                 <div className="flex items-center gap-2">
                   {user && (
                     <button 
@@ -998,6 +1327,17 @@ export default function GiliGuard() {
                     <Plus className="w-5 h-5" />
                   </button>
                 </div>
+              </div>
+
+              <div className="relative mb-6">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#3d6080]" />
+                <input 
+                  type="text"
+                  placeholder={lang === 'id' ? 'Cari barang...' : 'Search items...'}
+                  value={lfSearch}
+                  onChange={(e) => setLfSearch(e.target.value)}
+                  className="w-full bg-[#121f35] border border-white/5 rounded-2xl py-3 pl-11 pr-4 text-xs text-white placeholder-[#3d6080] focus:outline-none focus:border-[#3d9bff]/50 transition-all"
+                />
               </div>
 
               {!user && (
@@ -1020,14 +1360,26 @@ export default function GiliGuard() {
                 <div className="flex justify-center py-20">
                   <RefreshCw className="w-8 h-8 text-[#3d9bff] animate-spin" />
                 </div>
-              ) : lfItems.length === 0 ? (
+              ) : lfItems.filter(item => {
+                const matchesFilter = lfFilter === 'all' || item.type === lfFilter;
+                const matchesSearch = item.title.toLowerCase().includes(lfSearch.toLowerCase()) || 
+                                     item.description.toLowerCase().includes(lfSearch.toLowerCase());
+                return matchesFilter && matchesSearch;
+              }).length === 0 ? (
                 <div className="bg-[#121f35] border border-white/5 rounded-3xl p-12 text-center">
                   <div className="text-4xl mb-4 opacity-20">📦</div>
                   <div className="text-sm font-bold text-[#3d6080] uppercase tracking-widest">{t('lf_empty')}</div>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {lfItems.map((item) => (
+                  {lfItems
+                    .filter(item => {
+                      const matchesFilter = lfFilter === 'all' || item.type === lfFilter;
+                      const matchesSearch = item.title.toLowerCase().includes(lfSearch.toLowerCase()) || 
+                                           item.description.toLowerCase().includes(lfSearch.toLowerCase());
+                      return matchesFilter && matchesSearch;
+                    })
+                    .map((item) => (
                     <motion.div 
                       layout
                       key={item.id}
@@ -1175,131 +1527,246 @@ export default function GiliGuard() {
 
           {/* PAGE: INFO */}
           {activePage === 'info' && (
-            <motion.div key="info" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
-              <div>
-                <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-3 font-mono">📋 {t('lbl_hist')}</div>
-                <div className="bg-[#121f35] border border-white/5 rounded-2xl p-4">
-                  {history.length === 0 ? (
-                    <div className="text-center py-4 text-[11px] text-[#3d6080] font-mono">{t('hist_empty')}</div>
-                  ) : (
-                    <div className="space-y-4">
-                      {history.map((h, i) => (
-                        <div key={i} className="flex gap-3 border-b border-white/5 pb-3 last:border-0 last:pb-0">
-                          <div className="text-lg">🆘</div>
-                          <div>
-                            <div className="text-[11px] font-bold text-[#ff3c3c]">SOS SENT</div>
-                            <div className="text-[9px] text-[#7a9ab8] font-mono mt-1">{h.time} • {h.coords}</div>
-                          </div>
+            <motion.div 
+              key="info" 
+              initial={{ opacity: 0, y: 10 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, y: -10 }} 
+              className="space-y-6 pb-20"
+            >
+              {/* Info Header */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  {infoSubPage && (
+                    <button 
+                      onClick={() => setInfoSubPage(null)}
+                      className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-[#3d9bff]"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                  <h2 className="text-lg font-black text-white uppercase tracking-tighter">
+                    {infoSubPage ? t(`lbl_${infoSubPage}` as any) : t('tab_info')}
+                  </h2>
+                </div>
+                {!infoSubPage && (
+                  <div className="px-3 py-1 rounded-full bg-[#3d9bff]/10 border border-[#3d9bff]/20 text-[10px] font-bold text-[#3d9bff] uppercase tracking-widest">
+                    {t('ver')}
+                  </div>
+                )}
+              </div>
+
+              {!infoSubPage ? (
+                /* Main Menu List */
+                <div className="space-y-3">
+                  {[
+                    { id: 'peta', label: t('lbl_peta'), icon: MapPin, color: 'text-[#3d9bff]' },
+                    { id: 'settings', label: t('lbl_settings'), icon: Settings, color: 'text-[#3d9bff]' },
+                    { id: 'hist', label: t('lbl_hist'), icon: AlertCircle, color: 'text-[#ff3c3c]' },
+                    { id: 'rules', label: t('lbl_rules'), icon: Shield, color: 'text-[#ffb800]' },
+                    { id: 'links', label: t('lbl_links'), icon: ExternalLink, color: 'text-[#00e5b0]' },
+                    { id: 'about', label: t('lbl_about'), icon: Info, color: 'text-[#3d9bff]' },
+                    { id: 'dev', label: t('lbl_dev'), icon: Smartphone, color: 'text-[#ddeeff]' },
+                    { id: 'legal', label: t('lbl_legal'), icon: Shield, color: 'text-[#7a9ab8]' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setInfoSubPage(item.id)}
+                      className="w-full bg-[#121f35] border border-white/5 rounded-2xl p-4 flex items-center justify-between group hover:bg-white/5 transition-all active:scale-[0.98]"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={cn("w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center", item.color)}>
+                          <item.icon className="w-5 h-5" />
+                        </div>
+                        <span className="text-sm font-bold text-white tracking-tight">{item.label}</span>
+                      </div>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-[#3d6080] group-hover:text-[#3d9bff] transition-colors">
+                        <Navigation className="w-4 h-4 rotate-90" />
+                      </div>
+                    </button>
+                  ))}
+                  
+                  <div className="pt-8 text-center">
+                    <div className="text-[10px] text-[#3d6080] font-black uppercase tracking-widest mb-1">{t('about_dev')}</div>
+                    <div className="text-[9px] text-[#3d6080] italic opacity-60">{t('mission')}</div>
+                  </div>
+                </div>
+              ) : (
+                /* Sub Pages Content */
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="space-y-6"
+                >
+                  {infoSubPage === 'settings' && (
+                    <div className="space-y-6">
+                      <div className="bg-[#121f35] border border-white/5 rounded-2xl p-5">
+                        <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-4 font-mono">🌍 {t('lbl_lang')}</div>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { id: 'id', label: 'Bahasa Indonesia', flag: '🇮🇩' },
+                            { id: 'en', label: 'English', flag: '🇺🇸' }
+                          ].map((l) => (
+                            <button
+                              key={l.id}
+                              onClick={() => setLang(l.id as 'id' | 'en')}
+                              className={cn(
+                                "p-4 rounded-xl border transition-all flex flex-col items-center gap-2",
+                                lang === l.id 
+                                  ? "bg-[#3d9bff]/10 border-[#3d9bff] text-white shadow-[0_0_20px_rgba(61,155,255,0.2)]" 
+                                  : "bg-white/5 border-white/5 text-[#7a9ab8] hover:bg-white/10"
+                              )}
+                            >
+                              <span className="text-2xl">{l.flag}</span>
+                              <span className="text-[10px] font-bold uppercase tracking-widest">{l.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {infoSubPage === 'hist' && (
+                    <div className="bg-[#121f35] border border-white/5 rounded-2xl p-4">
+                      {history.length === 0 ? (
+                        <div className="text-center py-4 text-[11px] text-[#3d6080] font-mono">{t('hist_empty')}</div>
+                      ) : (
+                        <div className="space-y-4">
+                          {history.map((h, i) => (
+                            <div key={i} className="flex gap-3 border-b border-white/5 pb-3 last:border-0 last:pb-0">
+                              <div className="text-lg">🆘</div>
+                              <div>
+                                <div className="text-[11px] font-bold text-[#ff3c3c]">SOS SENT</div>
+                                <div className="text-[9px] text-[#7a9ab8] font-mono mt-1">{h.time} • {h.coords}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {infoSubPage === 'rules' && (
+                    <div className="space-y-2">
+                      {[t('rule1'), t('rule2'), t('rule3'), t('rule4')].map((rule, i) => (
+                        <div key={i} className="bg-[#121f35] border border-white/5 rounded-xl p-4 text-[11px] text-[#7a9ab8] flex items-center gap-3">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#3d9bff]/40" />
+                          {rule}
                         </div>
                       ))}
                     </div>
                   )}
-                </div>
-              </div>
 
-              <div>
-                <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-3 font-mono">📜 {t('lbl_rules')}</div>
-                <div className="grid grid-cols-1 gap-2">
-                  {[t('rule1'), t('rule2'), t('rule3'), t('rule4')].map((rule, i) => (
-                    <div key={i} className="bg-[#121f35] border border-white/5 rounded-xl p-3 text-[11px] text-[#7a9ab8] flex items-center gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#3d9bff]/40" />
-                      {rule}
+                  {infoSubPage === 'links' && (
+                    <div className="space-y-2">
+                      {[
+                        { label: t('link1'), icon: '🚢', url: 'https://gilitransfers.com/fastboat-schedule' },
+                        { label: t('link2'), icon: '🗺️', url: 'https://www.google.com/maps/search/Gili+Trawangan' },
+                        { label: t('link3'), icon: '♻️', url: 'https://giliecotrust.com/' }
+                      ].map((link, i) => (
+                        <button 
+                          key={i} 
+                          onClick={() => window.open(link.url, '_blank')}
+                          className="w-full bg-[#121f35] border border-white/5 rounded-xl p-4 text-[11px] text-[#7a9ab8] flex items-center justify-between hover:bg-white/10 hover:border-[#3d9bff]/30 transition-all active:scale-[0.98]"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-xl">{link.icon}</span>
+                            <span className="font-bold tracking-tight text-white">{link.label}</span>
+                          </div>
+                          <ExternalLink className="w-4 h-4 text-[#3d9bff]" />
+                        </button>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  )}
 
-              <div>
-                <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-3 font-mono">🔗 {t('lbl_links')}</div>
-                <div className="space-y-2">
-                  {[
-                    { label: t('link1'), icon: '🚢', url: 'https://gilitransfers.com/fastboat-schedule' },
-                    { label: t('link2'), icon: '🗺️', url: 'https://www.google.com/maps/search/Gili+Trawangan' },
-                    { label: t('link3'), icon: '♻️', url: 'https://giliecotrust.com/' }
-                  ].map((link, i) => (
-                    <button 
-                      key={i} 
-                      onClick={() => window.open(link.url, '_blank')}
-                      className="w-full bg-[#121f35] border border-white/5 rounded-xl p-3 text-[11px] text-[#7a9ab8] flex items-center justify-between hover:bg-white/10 hover:border-[#3d9bff]/30 transition-all active:scale-[0.98]"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-base">{link.icon}</span>
-                        <span className="font-bold tracking-tight">{link.label}</span>
+                  {infoSubPage === 'about' && (
+                    <div className="bg-[#121f35] border border-white/5 rounded-2xl p-6 space-y-5">
+                      <p className="text-xs text-[#7a9ab8] leading-relaxed">
+                        {t('about_desc')}
+                      </p>
+                      <div className="space-y-3">
+                        {[t('about_feature1'), t('about_feature2'), t('about_feature3'), t('about_feature4')].map((f, i) => (
+                          <div key={i} className="flex items-start gap-3 text-[11px] text-[#ddeeff] font-medium leading-tight">
+                            <CheckCircle2 className="w-4 h-4 text-[#00e5b0] shrink-0" />
+                            {f}
+                          </div>
+                        ))}
                       </div>
-                      <ExternalLink className="w-3.5 h-3.5 text-[#3d9bff] opacity-60" />
-                    </button>
-                  ))}
-                </div>
-              </div>
+                    </div>
+                  )}
 
-              <div className="pt-4 border-t border-white/5">
-                <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-4 font-mono">✨ {t('lbl_about')} GiliGuard</div>
-                <div className="bg-[#121f35] border border-white/5 rounded-2xl p-5 space-y-4">
-                  <p className="text-[11px] text-[#7a9ab8] leading-relaxed">
-                    {t('about_desc')}
-                  </p>
-                  <div className="space-y-2">
-                    {[t('about_feature1'), t('about_feature2'), t('about_feature3'), t('about_feature4')].map((f, i) => (
-                      <div key={i} className="flex items-center gap-3 text-[10px] text-[#ddeeff] font-medium">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-[#00e5b0]" />
-                        {f}
+                  {infoSubPage === 'dev' && (
+                    <div className="space-y-4">
+                      <div className="bg-gradient-to-br from-[#121f35] to-[#0d1829] border border-white/5 rounded-3xl p-6 flex flex-col items-center text-center shadow-2xl">
+                        <div className="w-24 h-24 rounded-3xl bg-[#3d9bff]/10 border border-[#3d9bff]/20 flex items-center justify-center overflow-hidden mb-4 rotate-3">
+                          <Image 
+                            src="https://picsum.photos/seed/developer/300/300" 
+                            alt="Developer" 
+                            width={96} 
+                            height={96}
+                            className="object-cover -rotate-3"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                        <div className="text-lg font-black text-white uppercase tracking-tight mb-1">{t('dev_name')}</div>
+                        <div className="text-[11px] text-[#3d9bff] font-bold mb-4 uppercase tracking-widest">{t('dev_role')}</div>
+                        <p className="text-xs text-[#7a9ab8] leading-relaxed italic mb-6">&quot;{t('dev_desc')}&quot;</p>
+                        
+                        <div className="grid grid-cols-5 gap-3 w-full">
+                          {[
+                            { icon: MessageSquare, url: 'https://wa.me/6285293514808', color: 'hover:bg-[#25D366]/20 hover:text-[#25D366]' },
+                            { icon: Instagram, url: 'https://instagram.com/zohidy', color: 'hover:bg-[#E4405F]/20 hover:text-[#E4405F]' },
+                            { icon: Linkedin, url: 'https://linkedin.com/in/zohidy', color: 'hover:bg-[#0A66C2]/20 hover:text-[#0A66C2]' },
+                            { icon: Github, url: 'https://github.com/zohidy', color: 'hover:bg-white/20 hover:text-white' },
+                            { icon: Mail, url: 'mailto:zohidydy@gmail.com', color: 'hover:bg-[#3d9bff]/20 hover:text-[#3d9bff]' }
+                          ].map((social, i) => (
+                            <button 
+                              key={i}
+                              onClick={() => window.open(social.url, '_blank')}
+                              className={cn(
+                                "aspect-square rounded-2xl bg-white/5 flex items-center justify-center text-[#3d6080] transition-all active:scale-90",
+                                social.color
+                              )}
+                            >
+                              <social.icon className="w-5 h-5" />
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                  <div className="pt-4 border-t border-white/5 flex flex-col items-center gap-2">
-                    <div className="text-[10px] text-[#3d6080] font-black uppercase tracking-widest">{t('about_dev')}</div>
-                    <div className="text-[9px] text-[#7a9ab8]">{t('ver')}</div>
-                    <div className="text-[9px] text-[#3d6080] italic">{t('mission')}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Developer Section */}
-              <div>
-                <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-3 font-mono">👨‍💻 {t('lbl_dev')}</div>
-                <div className="bg-gradient-to-br from-[#121f35] to-[#0d1829] border border-white/5 rounded-2xl p-5 flex items-center gap-4 shadow-xl">
-                  <div className="w-16 h-16 rounded-2xl bg-[#3d9bff]/10 border border-[#3d9bff]/20 flex items-center justify-center overflow-hidden">
-                    <Image 
-                      src="https://picsum.photos/seed/developer/200/200" 
-                      alt="Developer" 
-                      width={64} 
-                      height={64}
-                      className="object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-black text-white uppercase tracking-tight mb-0.5">{t('dev_name')}</div>
-                    <div className="text-[10px] text-[#3d9bff] font-bold mb-2 uppercase tracking-wide">{t('dev_role')}</div>
-                    <p className="text-[10px] text-[#7a9ab8] leading-tight italic">&quot;{t('dev_desc')}&quot;</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Legal Section */}
-              <div>
-                <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-3 font-mono">⚖️ {t('lbl_legal')}</div>
-                <div className="space-y-3">
-                  <div className="bg-[#121f35] border border-white/5 rounded-2xl p-4">
-                    <div className="text-[11px] font-black text-white uppercase tracking-wider mb-2 flex items-center gap-2">
-                      <Shield className="w-3 h-3 text-[#ff3c3c]" />
-                      {t('legal_terms_title')}
                     </div>
-                    <p className="text-[10px] text-[#7a9ab8] leading-relaxed">
-                      {t('legal_terms_desc')}
-                    </p>
-                  </div>
-                  <div className="bg-[#121f35] border border-white/5 rounded-2xl p-4">
-                    <div className="text-[11px] font-black text-white uppercase tracking-wider mb-2 flex items-center gap-2">
-                      <CheckCircle2 className="w-3 h-3 text-[#00e5b0]" />
-                      {t('legal_privacy_title')}
+                  )}
+
+                  {infoSubPage === 'legal' && (
+                    <div className="space-y-4">
+                      <div className="bg-[#121f35] border border-white/5 rounded-2xl p-5">
+                        <div className="text-xs font-black text-white uppercase tracking-wider mb-3 flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-[#ff3c3c]" />
+                          {t('legal_terms_title')}
+                        </div>
+                        <p className="text-[11px] text-[#7a9ab8] leading-relaxed">
+                          {t('legal_terms_desc')}
+                        </p>
+                      </div>
+                      <div className="bg-[#121f35] border border-white/5 rounded-2xl p-5">
+                        <div className="text-xs font-black text-white uppercase tracking-wider mb-3 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#00e5b0]" />
+                          {t('legal_privacy_title')}
+                        </div>
+                        <p className="text-[11px] text-[#7a9ab8] leading-relaxed">
+                          {t('legal_privacy_desc')}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-[10px] text-[#7a9ab8] leading-relaxed">
-                      {t('legal_privacy_desc')}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                  )}
+                  
+                  <button 
+                    onClick={() => setInfoSubPage(null)}
+                    className="w-full py-4 rounded-2xl bg-white/5 text-[10px] font-bold text-[#3d6080] uppercase tracking-widest hover:bg-white/10 transition-colors"
+                  >
+                    {t('lbl_back')}
+                  </button>
+                </motion.div>
+              )}
 
               <div className="pt-4 text-center">
                 <div className="mt-2 text-[8px] text-[#3d6080] uppercase tracking-widest opacity-40">{t('footer')}</div>
@@ -1311,41 +1778,47 @@ export default function GiliGuard() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="flex-shrink-0 bg-[#0d1829]/90 backdrop-blur-xl border-t border-white/5 px-4 py-1.5 pb-4 flex items-center justify-between z-50 fixed bottom-0 left-0 right-0 max-w-md mx-auto">
-        {[
-          { id: 'beranda', icon: Home, label: t('nav1') },
-          { id: 'kontak', icon: Phone, label: t('nav2') },
-          { id: 'p3k', icon: HeartPulse, label: t('nav3') },
-          { id: 'peta', icon: MapPin, label: t('nav4') },
-        ].map((item) => (
-          <button 
-            key={item.id}
-            onClick={() => setActivePage(item.id as Page)}
-            className="flex flex-col items-center gap-1 relative group flex-1"
-          >
-            <div className={cn(
-              "p-2 rounded-xl transition-all duration-300 relative overflow-hidden",
-              activePage === item.id 
-                ? "bg-[#3d9bff] text-white shadow-lg shadow-[#3d9bff]/20 scale-105" 
-                : "text-[#3d6080] hover:text-[#7a9ab8] hover:bg-white/5"
-            )}>
-              <item.icon className="w-5 h-5 relative z-10" />
-              {activePage === item.id && (
-                <motion.div 
-                  layoutId="nav-glow"
-                  className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent"
-                />
-              )}
-            </div>
-            <span className={cn(
-              "text-[9px] font-black uppercase tracking-widest transition-all duration-300",
-              activePage === item.id ? "text-white opacity-100" : "text-[#3d6080] opacity-60"
-            )}>
-              {item.label}
-            </span>
-          </button>
-        ))}
-      </nav>
+      <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none pb-6 px-4 bg-gradient-to-t from-[#080f1e] via-[#080f1e]/90 to-transparent pt-12">
+        <nav className="pointer-events-auto w-full max-w-md bg-[#121f35]/80 backdrop-blur-2xl border border-white/10 p-2 rounded-3xl flex items-center justify-between shadow-2xl shadow-black/50">
+          {[
+            { id: 'beranda', icon: Home, label: t('nav1') },
+            { id: 'kontak', icon: Phone, label: t('nav2') },
+            { id: 'p3k', icon: HeartPulse, label: t('nav3') },
+            { id: 'lostfound', icon: Package, label: t('nav6') },
+            { id: 'info', icon: MoreHorizontal, label: t('nav5') },
+          ].map((item) => {
+            const isActive = activePage === item.id;
+            return (
+              <button 
+                key={item.id}
+                onClick={() => {
+                  setActivePage(item.id as Page);
+                  if (item.id !== 'info') setInfoSubPage(null);
+                }}
+                className="flex flex-col items-center justify-center gap-1.5 relative flex-1 py-2 rounded-2xl transition-all duration-300 group"
+              >
+                {isActive && (
+                  <motion.div 
+                    layoutId="nav-active-bg"
+                    className="absolute inset-0 bg-white/5 rounded-2xl"
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  />
+                )}
+                <item.icon className={cn(
+                  "w-5 h-5 relative z-10 transition-all duration-300",
+                  isActive ? "text-[#3d9bff] scale-110" : "text-[#3d6080] group-hover:text-[#7a9ab8] group-hover:scale-110"
+                )} />
+                <span className={cn(
+                  "text-[9px] font-bold tracking-wide relative z-10 transition-all duration-300 truncate w-full text-center px-1",
+                  isActive ? "text-white" : "text-[#3d6080] group-hover:text-[#7a9ab8]"
+                )}>
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
 
       {/* SOS MODAL */}
       <AnimatePresence>

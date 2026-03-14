@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   --font-sans: var(--font-sans);
@@ -41,6 +42,17 @@ body {
     background-size: 200% 200%;
     animation: gradient-x 3s ease infinite;
   }
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes glow {
+  from { box-shadow: 0 0 10px -5px rgba(255, 60, 60, 0.5); }
+  to { box-shadow: 0 0 20px 5px rgba(255, 60, 60, 0.8); }
 }
 
 @keyframes gradient-x {
