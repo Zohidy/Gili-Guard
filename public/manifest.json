@@ -8,12 +8,12 @@
   "theme_color": "#ff3c3c",
   "icons": [
     {
-      "src": "https://picsum.photos/seed/giliguard/192/192",
+      "src": "https://picsum.photos/seed/sos-shield-red/192/192",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://picsum.photos/seed/giliguard/512/512",
+      "src": "https://picsum.photos/seed/sos-shield-red/512/512",
       "sizes": "512x512",
       "type": "image/png"
     }

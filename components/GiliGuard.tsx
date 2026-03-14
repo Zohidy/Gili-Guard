@@ -533,7 +533,7 @@ export default function GiliGuard() {
     <div className="max-w-md mx-auto h-[100dvh] bg-[#080f1e] text-[#ddeeff] flex flex-col relative overflow-hidden">
       
       {/* Header */}
-      <header className="flex-shrink-0 bg-[#0d1829]/90 backdrop-blur-xl border-b border-white/10 p-4 pt-10 flex items-center gap-4 z-30 sticky top-0 shadow-2xl shadow-black/20">
+      <header className="flex-shrink-0 bg-[#0d1829]/90 backdrop-blur-xl border-b border-white/10 p-4 pt-6 flex items-center gap-4 z-30 sticky top-0 shadow-2xl shadow-black/20">
         <div className="relative group">
           <div className="absolute -inset-1 bg-gradient-to-tr from-[#ff3c3c] to-[#3d9bff] rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
           <div className="relative w-11 h-11 bg-[#0d1829] border border-white/10 rounded-2xl flex items-center justify-center text-[#ff3c3c] shadow-xl overflow-hidden">
@@ -842,16 +842,20 @@ export default function GiliGuard() {
                 <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-3 font-mono">🔗 {t('lbl_links')}</div>
                 <div className="space-y-2">
                   {[
-                    { label: t('link1'), icon: '🚢' },
-                    { label: t('link2'), icon: '🗺️' },
-                    { label: t('link3'), icon: '♻️' }
+                    { label: t('link1'), icon: '🚢', url: 'https://gilitransfers.com/fastboat-schedule' },
+                    { label: t('link2'), icon: '🗺️', url: 'https://www.google.com/maps/search/Gili+Trawangan' },
+                    { label: t('link3'), icon: '♻️', url: 'https://giliecotrust.com/' }
                   ].map((link, i) => (
-                    <button key={i} className="w-full bg-[#121f35] border border-white/5 rounded-xl p-3 text-[11px] text-[#7a9ab8] flex items-center justify-between hover:bg-white/5 transition-colors">
+                    <button 
+                      key={i} 
+                      onClick={() => window.open(link.url, '_blank')}
+                      className="w-full bg-[#121f35] border border-white/5 rounded-xl p-3 text-[11px] text-[#7a9ab8] flex items-center justify-between hover:bg-white/10 hover:border-[#3d9bff]/30 transition-all active:scale-[0.98]"
+                    >
                       <div className="flex items-center gap-3">
-                        <span>{link.icon}</span>
-                        {link.label}
+                        <span className="text-base">{link.icon}</span>
+                        <span className="font-bold tracking-tight">{link.label}</span>
                       </div>
-                      <ExternalLink className="w-3 h-3 opacity-40" />
+                      <ExternalLink className="w-3.5 h-3.5 text-[#3d9bff] opacity-60" />
                     </button>
                   ))}
                 </div>
@@ -870,7 +874,7 @@ export default function GiliGuard() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="flex-shrink-0 bg-[#0d1829]/90 backdrop-blur-xl border-t border-white/5 px-4 py-3 pb-8 flex items-center justify-between z-50 fixed bottom-0 left-0 right-0 max-w-md mx-auto">
+      <nav className="flex-shrink-0 bg-[#0d1829]/90 backdrop-blur-xl border-t border-white/5 px-4 py-2 pb-5 flex items-center justify-between z-50 fixed bottom-0 left-0 right-0 max-w-md mx-auto">
         {[
           { id: 'beranda', icon: Home, label: t('nav1') },
           { id: 'kontak', icon: Phone, label: t('nav2') },
