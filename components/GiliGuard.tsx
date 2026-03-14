@@ -1,0 +1,842 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
+import { 
+  Phone, Shield, HeartPulse, MapPin, AlertCircle, 
+  Info, Navigation, Anchor, LifeBuoy, Home, 
+  Settings, Cloud, Wind, Waves, RefreshCw, X, CheckCircle2,
+  Droplets, Thermometer, Sun, CloudSun, CloudRain, 
+  CloudLightning, CloudFog, CloudDrizzle
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '@/lib/utils';
+
+// --- Types ---
+type Lang = 'id' | 'en';
+type Page = 'beranda' | 'kontak' | 'p3k' | 'peta' | 'info';
+
+interface WeatherData {
+  temp: number;
+  apparentTemp: number;
+  humidity: number;
+  windSpeed: number;
+  windDir: number;
+  weatherCode: number;
+  waveHeight: number | null;
+}
+
+// --- Constants & Translations ---
+const STRINGS = {
+  htitle: { id: 'Gili Trawangan SOS', en: 'Gili Trawangan SOS' },
+  hsub: { id: 'Mencari lokasi GPS...', en: 'Finding GPS location...' },
+  sos_sub: { id: 'Tekan darurat', en: 'Tap for emergency' },
+  sos_hint: { id: 'Tekan → Konfirmasi → Langsung telepon 112', en: 'Tap → Confirm → Calls 112 directly' },
+  lbl_quick: { id: 'Akses Cepat', en: 'Quick Access' },
+  q1: { id: 'Kontak Darurat', en: 'Emergency Contacts' },
+  q2: { id: 'Pertolongan Pertama', en: 'First Aid' },
+  q3: { id: 'Fasilitas Terdekat', en: 'Nearest Facilities' },
+  q4: { id: 'Ambulans 119', en: 'Ambulance 119' },
+  q5: { id: 'Polisi 110', en: 'Police 110' },
+  q6: { id: 'SAR Laut 115', en: 'Sea Rescue 115' },
+  lbl_tips: { id: 'Tips Keselamatan', en: 'Safety Tips' },
+  tips_title: { id: 'Kondisi Hari Ini', en: "Today's Conditions" },
+  tip1: { id: 'Selalu pakai pelampung saat aktivitas laut', en: 'Always wear a life jacket during water activities' },
+  tip2: { id: 'Tidak ada kendaraan bermotor – cidomo & sepeda saja', en: 'No motorised vehicles on Gili – cidomo & bicycle only' },
+  tip3: { id: 'Minum air putih min. 2L/hari di cuaca panas ini', en: 'Drink minimum 2L of water per day in this heat' },
+  tip4: { id: 'Snorkeling: selalu bersama teman, jangan sendiri', en: 'Snorkelling: always go with a buddy, never alone' },
+  tip5: { id: 'Evakuasi ke RS: cidomo → perahu → Pelabuhan Bangsal (±45 mnt)', en: 'Hospital evacuation: cidomo → boat → Bangsal Port (±45 min)' },
+  tip6: { id: 'Waspada arus kuat di sisi timur pulau saat pasang', en: 'Beware of strong currents on the east side during high tide' },
+  tip7: { id: 'Simpan nomor darurat di kontak cepat ponsel Anda', en: 'Save emergency numbers in your phone speed dial' },
+  tip8: { id: 'Jangan menyentuh atau menginjak terumbu karang', en: 'Do not touch or step on coral reefs' },
+  tip9: { id: 'Gunakan tabir surya ramah lingkungan (reef-safe)', en: 'Use eco-friendly (reef-safe) sunscreen' },
+  tip10: { id: 'Hati-hati saat bersepeda di malam hari, jalanan gelap', en: 'Be careful when cycling at night, roads are dark' },
+  nav1: { id: 'Beranda', en: 'Home' },
+  nav2: { id: 'Kontak', en: 'Contacts' },
+  nav3: { id: 'P3K', en: 'First Aid' },
+  nav4: { id: 'Peta', en: 'Map' },
+  nav5: { id: 'Info', en: 'Info' },
+  m_title: { id: 'Hubungi 112 Sekarang?', en: 'Call 112 Now?' },
+  m_desc: { id: 'Aplikasi akan langsung menelepon 112 — darurat nasional terhubung ke polisi, ambulans, dan SAR.', en: 'The app will directly call 112 — the national emergency number connected to police, ambulance and SAR.' },
+  m_cancel: { id: 'Batal', en: 'Cancel' },
+  m_call: { id: '📞 TELEPON 112', en: '📞 CALL 112' },
+  m_abort: { id: '✕ Batalkan Panggilan', en: '✕ Cancel Call' },
+  cd_text: { id: 'Menelepon dalam', en: 'Calling in' },
+  cd_sec: { id: 'detik...', en: 'seconds...' },
+  sent_title: { id: 'MENELEPON 112...', en: 'CALLING 112...' },
+  sent_close: { id: 'Tutup', en: 'Close' },
+  hist_empty: { id: 'Belum ada aktivasi SOS', en: 'No SOS activations yet' },
+  emg_txt: { id: 'Darurat nasional · 24 jam · Semua darurat', en: 'National emergency · 24 hours · All emergencies' },
+  c1r: { id: 'Klinik di pulau · Terverifikasi', en: 'On-island clinic · Verified' },
+  c2r: { id: 'Klinik di pulau · Terverifikasi', en: 'On-island clinic · Verified' },
+  c3r: { id: 'RS terdekat · 45 mnt dengan speedboat', en: 'Nearest hospital · 45 min by speedboat' },
+  c4r: { id: 'Polisi di pulau · 24 jam', en: 'On-island police · 24 hours' },
+  c5r: { id: 'Tim SAR Mataram · Evakuasi laut', en: 'Mataram SAR Team · Sea evacuation' },
+  c6r: { id: 'Klinik di pulau · 24 jam', en: 'On-island clinic · 24 hours' },
+  c7r: { id: 'Klinik di pulau · Terverifikasi', en: 'On-island clinic · Verified' },
+  c8r: { id: 'Damkar KLU · Respon cepat', en: 'North Lombok Fire Dept · Fast response' },
+  c9r: { id: 'Unit Damkar Pulau · Respon lokal', en: 'Island Fire Unit · Local response' },
+  lbl_med: { id: 'Kontak Medis', en: 'Medical Contacts' },
+  lbl_pol: { id: 'Polisi & Keamanan', en: 'Police & Security' },
+  lbl_fire: { id: 'Pemadam Kebakaran', en: 'Fire Department' },
+  lbl_sar: { id: 'SAR & Evakuasi', en: 'SAR & Evacuation' },
+  lbl_hist: { id: 'Riwayat SOS', en: 'SOS History' },
+  lbl_about: { id: 'Tentang', en: 'About' },
+  ver: { id: 'Versi 2.0 – Bilingual', en: 'Version 2.0 – Bilingual' },
+  mission: { id: 'Dibuat untuk keselamatan Gili · Gratis selamanya', en: 'Built for Gili safety · Free forever' },
+  footer: { id: 'Untuk wisatawan & warga lokal · Gili Trawangan, NTB', en: 'Built for tourists & locals · Gili Trawangan, NTB' },
+};
+
+const P3K_GUIDES = [
+  {
+    id: 'p1',
+    icon: '🌊',
+    title: { id: 'Tenggelam / Hampir tenggelam', en: 'Drowning / Near-drowning' },
+    tags: ['KRITIS', 'LAUT'],
+    steps: [
+      { id: 's1', text: { id: 'Pastikan kamu aman dahulu. Jangan terjun — gunakan pelampung, tali, atau benda terapung.', en: "Make sure YOU are safe first. Don't jump in — use a life ring, rope, or floating object." } },
+      { id: 's2', text: { id: 'Keluarkan korban dari air. Posisi terlentang di permukaan datar. Minta bantuan serentak.', en: 'Pull victim out of water. Lay flat on their back. Call for help simultaneously.' } },
+      { id: 's3', text: { id: 'Cek napas. Jika tidak bernapas: CPR — 30 tekanan dada + 2 napas buatan.', en: 'Check breathing. If not breathing: CPR — 30 compressions + 2 breaths.' } }
+    ],
+    warning: { id: 'Hubungi klinik atau SAR (115) segera!', en: 'Call clinic or SAR (115) immediately!' }
+  },
+  {
+    id: 'p2',
+    icon: '🪸',
+    title: { id: 'Sengatan ubur-ubur & karang', en: 'Jellyfish & Coral sting' },
+    tags: ['SEDANG', 'LAUT'],
+    steps: [
+      { id: 's1', text: { id: 'Jangan gosok area sengatan. Lepas tentakel dengan kartu/penjepit.', en: 'Do NOT rub the sting area. Remove tentacles with a card or tweezers.' } },
+      { id: 's2', text: { id: 'Bilas dengan air laut (bukan air tawar). Siram cuka jika ada.', en: 'Rinse with seawater (NOT fresh water). Use vinegar if available.' } }
+    ],
+    warning: { id: 'Jika sesak napas atau bengkak parah — segera ke klinik!', en: 'If shortness of breath or severe swelling — go to clinic!' }
+  }
+];
+
+const EMERGENCY_CONTACTS = [
+  { name: 'Prima Medika Gili', role: 'c1r', num: '+6285186678911', icon: '🏥', type: 'med' },
+  { name: 'Blue Island Medical', role: 'c7r', num: '+6281997733332', icon: '🏥', type: 'med' },
+  { name: 'Warna Medica Gili', role: 'c2r', num: '+6287862060247', icon: '🏥', type: 'med' },
+  { name: 'Klinik Gili Trawangan', role: 'c6r', num: '+6281997733331', icon: '🏥', type: 'med' },
+  { name: 'Polisi Gili Indah', role: 'c4r', num: '+6281917444441', icon: '👮', type: 'pol' },
+  { name: 'Damkar Gili Trawangan', role: 'c9r', num: '+6281917444441', icon: '🚒', type: 'fire' },
+  { name: 'Damkar Lombok Utara', role: 'c8r', num: '+623706123113', icon: '🔥', type: 'fire' },
+  { name: 'RSUD Tanjung', role: 'c3r', num: '+628123789420', icon: '🏨', type: 'med' },
+  { name: 'Basarnas Mataram', role: 'c5r', num: '+62370633253', icon: '⚓', type: 'sar' },
+];
+
+// --- Components ---
+
+const WEATHER_DESCRIPTIONS: Record<number, { id: string, en: string }> = {
+  0: { id: 'Langit cerah', en: 'Clear sky' },
+  1: { id: 'Cerah berawan', en: 'Mainly clear' },
+  2: { id: 'Berawan', en: 'Partly cloudy' },
+  3: { id: 'Mendung', en: 'Overcast' },
+  45: { id: 'Kabut', en: 'Fog' },
+  48: { id: 'Kabut rime', en: 'Depositing rime fog' },
+  51: { id: 'Gerimis ringan', en: 'Light drizzle' },
+  53: { id: 'Gerimis sedang', en: 'Moderate drizzle' },
+  55: { id: 'Gerimis lebat', en: 'Dense drizzle' },
+  61: { id: 'Hujan ringan', en: 'Slight rain' },
+  63: { id: 'Hujan sedang', en: 'Moderate rain' },
+  65: { id: 'Hujan lebat', en: 'Heavy rain' },
+  80: { id: 'Hujan rintik', en: 'Slight rain showers' },
+  81: { id: 'Hujan deras', en: 'Moderate rain showers' },
+  82: { id: 'Hujan sangat deras', en: 'Violent rain showers' },
+  95: { id: 'Badai petir', en: 'Thunderstorm' },
+};
+
+const ContactCard = ({ c, t, lang }: { c: any, t: any, lang: Lang }) => (
+  <motion.div 
+    whileHover={{ scale: 1.02 }}
+    whileTap={{ scale: 0.98 }}
+    className="bg-white/[0.03] border border-white/[0.05] rounded-2xl p-4 flex items-center gap-4 hover:bg-white/[0.06] transition-all group relative overflow-hidden"
+  >
+    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-transparent via-[#3d9bff] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-2xl group-hover:rotate-6 transition-transform shadow-inner">{c.icon}</div>
+    <div className="flex-1 min-w-0">
+      <div className="text-sm font-black truncate text-white tracking-tight">{c.name}</div>
+      <div className="text-[10px] text-[#7a9ab8] font-bold uppercase tracking-wider opacity-70">{t(c.role as any)}</div>
+      <div className="text-[11px] text-[#3d9bff] font-mono font-bold mt-1 tracking-tight flex items-center gap-1">
+        <div className="w-1 h-1 rounded-full bg-[#3d9bff]/40" />
+        {c.num}
+      </div>
+    </div>
+    <button 
+      onClick={() => window.location.href = `tel:${c.num}`} 
+      className="w-10 h-10 rounded-full bg-[#00e5b0]/10 flex items-center justify-center text-[#00e5b0] hover:bg-[#00e5b0] hover:text-[#080f1e] transition-all shadow-lg shadow-[#00e5b0]/10"
+    >
+      <Phone className="w-4 h-4" />
+    </button>
+  </motion.div>
+);
+
+const WeatherCard = ({ lang, weather, loading, onRefresh }: { lang: Lang, weather: WeatherData | null, loading: boolean, onRefresh: () => void }) => {
+  if (loading && !weather) return (
+    <div className="bg-[#121f35]/50 border border-white/10 rounded-3xl p-8 flex items-center justify-center mb-6 h-48">
+      <RefreshCw className="w-6 h-6 text-[#7a9ab8] animate-spin" />
+    </div>
+  );
+
+  if (!weather) return null;
+
+  const desc = WEATHER_DESCRIPTIONS[weather.weatherCode] || { id: 'Kondisi normal', en: 'Normal conditions' };
+
+  const getWeatherIcon = (code: number) => {
+    if (code === 0) return <Sun className="w-8 h-8 text-yellow-400" />;
+    if (code === 1 || code === 2) return <CloudSun className="w-8 h-8 text-yellow-200" />;
+    if (code === 3) return <Cloud className="w-8 h-8 text-slate-400" />;
+    if (code === 45 || code === 48) return <CloudFog className="w-8 h-8 text-slate-300" />;
+    if (code >= 51 && code <= 55) return <CloudDrizzle className="w-8 h-8 text-blue-300" />;
+    if (code >= 61 && code <= 65) return <CloudRain className="w-8 h-8 text-blue-400" />;
+    if (code >= 80 && code <= 82) return <CloudRain className="w-8 h-8 text-blue-400" />;
+    if (code >= 95) return <CloudLightning className="w-8 h-8 text-amber-400" />;
+    return <Sun className="w-8 h-8 text-yellow-400" />;
+  };
+
+  return (
+    <div className="bg-gradient-to-br from-[#1a2a44] to-[#0d1829] border border-white/10 rounded-[2rem] p-6 relative overflow-hidden mb-8 shadow-2xl shadow-black/40">
+      <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#3d9bff] via-[#00e5b0] to-[#3d9bff] animate-gradient-x opacity-50" />
+      
+      <div className="flex items-start justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center shadow-inner border border-white/5">
+            {getWeatherIcon(weather.weatherCode)}
+          </div>
+          <div>
+            <div className="text-[10px] text-[#7a9ab8] font-black uppercase tracking-[0.2em] mb-1">Gili Trawangan</div>
+            <div className="text-xs font-bold text-[#00e5b0] flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#00e5b0] animate-pulse" />
+              {desc[lang].toUpperCase()}
+            </div>
+          </div>
+        </div>
+        <button 
+          onClick={onRefresh} 
+          disabled={loading}
+          className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-[#7a9ab8] hover:text-white disabled:opacity-50 border border-white/5"
+        >
+          <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+        </button>
+      </div>
+
+      <div className="flex items-baseline gap-2 mb-8">
+        <span className="text-6xl font-black text-white tracking-tighter drop-shadow-2xl">
+          {Math.round(weather.temp)}°
+        </span>
+        <div className="flex flex-col">
+          <span className="text-sm font-black text-[#7a9ab8] uppercase tracking-widest">Celsius</span>
+          <span className="text-[10px] font-bold text-[#3d6080]">
+            {lang === 'id' ? 'Terasa' : 'Feels'} {Math.round(weather.apparentTemp)}°
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {[
+          { icon: Waves, label: 'Waves', val: `${weather.waveHeight?.toFixed(1)}m`, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+          { icon: Wind, label: 'Wind', val: `${Math.round(weather.windSpeed)} km/h`, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+          { icon: Droplets, label: 'Humidity', val: `${weather.humidity}%`, color: 'text-cyan-400', bg: 'bg-cyan-400/10' },
+          { icon: Navigation, label: 'Direction', val: `${weather.windDir}°`, color: 'text-orange-400', bg: 'bg-orange-400/10' },
+        ].map((item, i) => (
+          <div key={i} className="bg-white/[0.03] border border-white/[0.05] rounded-2xl p-3.5 flex items-center gap-3">
+            <div className={cn("p-2 rounded-xl", item.bg)}>
+              <item.icon className={cn("w-4 h-4", item.color)} />
+            </div>
+            <div>
+              <div className="text-[9px] text-[#3d6080] uppercase font-black tracking-wider">{item.label}</div>
+              <div className="text-sm font-black text-white font-mono">{item.val}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default function GiliGuard() {
+  const [lang, setLang] = useState<Lang>('id');
+  const [activePage, setActivePage] = useState<Page>('beranda');
+  const [showSOSModal, setShowSOSModal] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [isSOSSent, setIsSOSSent] = useState(false);
+  const [sosTimer, setSosTimer] = useState(0);
+  const [coords, setCoords] = useState<string>('--');
+  const [history, setHistory] = useState<{ time: string, coords: string }[]>([]);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  // Weather state moved to main component
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(true);
+
+  const fetchWeather = useCallback(async () => {
+    setWeatherLoading(true);
+    try {
+      const lat = -8.3535, lon = 116.0416;
+      let wData: any = null;
+      try {
+        const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code,apparent_temperature&timezone=Asia%2FMakassar`);
+        if (wRes.ok) wData = await wRes.json();
+      } catch (e) { console.warn('Forecast API failed', e); }
+
+      let mData: any = null;
+      try {
+        const mRes = await fetch(`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height,wind_wave_height&timezone=Asia%2FMakassar`);
+        if (mRes.ok) mData = await mRes.json();
+      } catch (e) { console.warn('Marine API failed', e); }
+      
+      if (wData?.current) {
+        setWeather({
+          temp: wData.current.temperature_2m,
+          apparentTemp: wData.current.apparent_temperature || wData.current.temperature_2m,
+          humidity: wData.current.relative_humidity_2m,
+          windSpeed: wData.current.wind_speed_10m,
+          windDir: wData.current.wind_direction_10m,
+          weatherCode: wData.current.weather_code,
+          waveHeight: mData?.current?.wave_height || mData?.current?.wind_wave_height || 0.5
+        });
+      } else {
+        setWeather({
+          temp: 29, apparentTemp: 32, humidity: 75, windSpeed: 12, windDir: 180, weatherCode: 0, waveHeight: 0.5
+        });
+      }
+    } catch (e) {
+      console.error('Weather fetch error', e);
+    } finally {
+      setWeatherLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWeather();
+  }, [fetchWeather]);
+
+  // Dynamic Safety Tips based on weather
+  const getDynamicTips = () => {
+    const baseTips = [
+      STRINGS.tip1[lang], STRINGS.tip2[lang], STRINGS.tip3[lang], 
+      STRINGS.tip4[lang], STRINGS.tip5[lang], STRINGS.tip6[lang], 
+      STRINGS.tip7[lang], STRINGS.tip8[lang], STRINGS.tip9[lang], 
+      STRINGS.tip10[lang]
+    ];
+
+    if (!weather) return baseTips;
+
+    const dynamicTips = [...baseTips];
+
+    // Weather specific adjustments
+    if (weather.weatherCode >= 51) { // Rain/Drizzle
+      dynamicTips[0] = lang === 'id' ? '⚠️ Hujan: Jalanan licin, hati-hati bersepeda' : '⚠️ Rain: Slippery roads, be careful cycling';
+      dynamicTips[5] = lang === 'id' ? '⚠️ Arus laut mungkin lebih kuat saat hujan' : '⚠️ Sea currents may be stronger during rain';
+    }
+
+    if (weather.temp > 32) { // Very hot
+      dynamicTips[2] = lang === 'id' ? '🔥 Cuaca sangat panas! Minum air min. 3L/hari' : '🔥 Extremely hot! Drink min. 3L of water/day';
+    }
+
+    if (weather.waveHeight && weather.waveHeight > 1.2) { // High waves
+      dynamicTips[3] = lang === 'id' ? '🌊 Gelombang tinggi! Hindari snorkeling di area terbuka' : '🌊 High waves! Avoid snorkeling in open areas';
+    }
+
+    if (weather.windSpeed > 20) { // Strong wind
+      dynamicTips[1] = lang === 'id' ? '💨 Angin kencang! Waspada pohon tumbang & debu' : '💨 Strong wind! Beware of falling trees & dust';
+    }
+
+    return dynamicTips;
+  };
+
+  // PWA Install Prompt
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
+
+  // GPS Tracking
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) return;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => setCoords(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`),
+      () => setCoords('Gili Trawangan, NTB')
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  const triggerSOS = useCallback(() => {
+    setShowSOSModal(false);
+    setIsSOSSent(true);
+    setSosTimer(0);
+    setHistory(prev => [{ time: new Date().toLocaleTimeString(), coords }, ...prev]);
+    window.location.href = 'tel:112';
+  }, [coords]);
+
+  // SOS Countdown Logic
+  useEffect(() => {
+    if (countdown === null || countdown <= 0) return;
+
+    const timer = setTimeout(() => {
+      setCountdown(prev => {
+        if (prev === 1) {
+          triggerSOS();
+          return null;
+        }
+        return prev !== null ? prev - 1 : null;
+      });
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [countdown, triggerSOS]);
+
+  // SOS Timer Logic
+  useEffect(() => {
+    if (!isSOSSent) return;
+    const timer = setInterval(() => setSosTimer(prev => prev + 1), 1000);
+    return () => clearInterval(timer);
+  }, [isSOSSent]);
+
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  const t = (key: keyof typeof STRINGS) => STRINGS[key][lang];
+
+  return (
+    <div className="max-w-md mx-auto h-[100dvh] bg-[#080f1e] text-[#ddeeff] flex flex-col relative overflow-hidden">
+      
+      {/* Header */}
+      <header className="flex-shrink-0 bg-[#0d1829]/80 backdrop-blur-md border-b border-white/5 p-4 pt-8 flex items-center gap-3 z-30 sticky top-0">
+        <div className="w-10 h-10 bg-gradient-to-br from-[#ff3c3c] to-[#c81414] rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-[#ff3c3c]/20 border border-white/10">🆘</div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-black tracking-tight text-white uppercase">{t('htitle')}</div>
+          <div className="text-[9px] text-[#7a9ab8] font-mono truncate tracking-tight opacity-60">{coords}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex bg-white/5 border border-white/5 rounded-xl overflow-hidden p-0.5">
+            <button 
+              onClick={() => setLang('id')}
+              className={cn("px-2.5 py-1.5 text-[10px] font-black font-mono transition-all rounded-lg", lang === 'id' ? "bg-[#3d9bff] text-white shadow-lg" : "text-[#3d6080] hover:text-[#7a9ab8]")}
+            >ID</button>
+            <button 
+              onClick={() => setLang('en')}
+              className={cn("px-2.5 py-1.5 text-[10px] font-black font-mono transition-all rounded-lg", lang === 'en' ? "bg-[#3d9bff] text-white shadow-lg" : "text-[#3d6080] hover:text-[#7a9ab8]")}
+            >EN</button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Scroll Area */}
+      <main className="flex-1 overflow-y-auto p-5 pb-32 scrollbar-hide">
+        <AnimatePresence mode="wait">
+          
+          {/* PAGE: BERANDA */}
+          {activePage === 'beranda' && (
+            <motion.div key="beranda" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <WeatherCard lang={lang} weather={weather} loading={weatherLoading} onRefresh={fetchWeather} />
+              
+              <div className="flex flex-col items-center gap-4 py-8 mb-10 relative">
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#ff3c3c]/5 to-transparent pointer-events-none" />
+                <div className="w-48 h-48 rounded-full bg-[#ff3c3c]/5 flex items-center justify-center relative">
+                  <motion.div 
+                    animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="absolute inset-0 rounded-full border-2 border-[#ff3c3c]/20" 
+                  />
+                  <motion.div 
+                    animate={{ scale: [1, 1.5, 1], opacity: [0.1, 0.2, 0.1] }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                    className="absolute inset-[-12px] rounded-full border border-[#ff3c3c]/10" 
+                  />
+                  <button 
+                    onClick={() => setShowSOSModal(true)}
+                    className="w-36 h-36 rounded-full bg-gradient-to-br from-[#ff6060] via-[#ff3c3c] to-[#c81414] shadow-[0_0_60px_rgba(255,60,60,0.5)] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform z-10 border-4 border-white/10"
+                  >
+                    <div className="text-4xl font-black text-white tracking-widest drop-shadow-2xl">SOS</div>
+                    <div className="text-[10px] text-white/80 font-black uppercase tracking-[0.2em]">{t('sos_sub')}</div>
+                  </button>
+                </div>
+                <div className="text-[10px] text-[#3d6080] font-black uppercase tracking-widest text-center max-w-[200px] leading-relaxed opacity-60">{t('sos_hint')}</div>
+              </div>
+
+              <div className="text-[11px] font-black text-[#3d6080] uppercase tracking-[0.2em] mb-4 px-1 font-mono flex items-center gap-2">
+                <div className="w-8 h-[1px] bg-[#3d6080]/30" />
+                {t('lbl_quick')}
+              </div>
+              <div className="grid grid-cols-3 gap-3 mb-10">
+                {[
+                  { icon: '📞', label: t('q1'), page: 'kontak', color: 'from-blue-500/20 to-blue-600/5' },
+                  { icon: '🩹', label: t('q2'), page: 'p3k', color: 'from-emerald-500/20 to-emerald-600/5' },
+                  { icon: '📍', label: t('q3'), page: 'peta', color: 'from-orange-500/20 to-orange-600/5' },
+                  { icon: '🚑', label: t('q4'), call: '119', color: 'from-red-500/20 to-red-600/5' },
+                  { icon: '👮', label: t('q5'), call: '110', color: 'from-indigo-500/20 to-indigo-600/5' },
+                  { icon: '⚓', label: t('q6'), call: '115', color: 'from-cyan-500/20 to-cyan-600/5' },
+                ].map((item, i) => (
+                  <motion.button 
+                    key={i}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => item.page ? setActivePage(item.page as Page) : window.location.href = `tel:${item.call}`}
+                    className={cn("bg-gradient-to-br border border-white/5 rounded-3xl p-4 flex flex-col items-center gap-3 transition-all shadow-lg", item.color)}
+                  >
+                    <div className="text-2xl drop-shadow-md">{item.icon}</div>
+                    <div className="text-[10px] font-black text-[#7a9ab8] text-center leading-tight uppercase tracking-tight">{item.label}</div>
+                  </motion.button>
+                ))}
+              </div>
+
+              <div className="text-[11px] font-black text-[#3d6080] uppercase tracking-[0.2em] mb-4 px-1 font-mono flex items-center gap-2">
+                <div className="w-8 h-[1px] bg-[#3d6080]/30" />
+                {t('lbl_tips')}
+              </div>
+              <div className="bg-[#121f35]/50 border border-white/5 rounded-[2rem] overflow-hidden mb-10 shadow-xl">
+                <div className="p-4 bg-white/5 flex items-center gap-3 border-b border-white/5">
+                  <div className="p-2 bg-[#ffb830]/10 rounded-xl">
+                    <AlertCircle className="w-4 h-4 text-[#ffb830]" />
+                  </div>
+                  <div className="text-xs font-black uppercase tracking-wider text-white">{t('tips_title')}</div>
+                </div>
+                <div className="divide-y divide-white/5">
+                  {getDynamicTips().map((tip, i) => (
+                    <motion.div 
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      key={i} 
+                      className="p-4 flex items-start gap-4 hover:bg-white/[0.02] transition-colors"
+                    >
+                      <div className="w-2 h-2 rounded-full bg-[#00e5b0] mt-1.5 shrink-0 shadow-[0_0_8px_rgba(0,229,176,0.5)]" />
+                      <div className="text-[12px] text-[#7a9ab8] leading-relaxed font-medium">{tip}</div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+
+              {deferredPrompt && (
+                <button 
+                  onClick={handleInstall}
+                  className="w-full bg-gradient-to-r from-[#00e5b0] to-[#3d9bff] p-4 rounded-2xl text-white font-black text-sm shadow-xl shadow-emerald-900/20 mb-6 flex items-center justify-center gap-2"
+                >
+                  📥 {lang === 'id' ? 'INSTALL APLIKASI' : 'INSTALL APP'}
+                </button>
+              )}
+            </motion.div>
+          )}
+
+          {/* PAGE: KONTAK */}
+          {activePage === 'kontak' && (
+            <motion.div key="kontak" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <div className="bg-[#ff3c3c]/10 border border-[#ff3c3c]/20 rounded-2xl p-4 flex items-center justify-between mb-6">
+                <div>
+                  <div className="text-2xl font-black text-[#ff3c3c] font-mono">112</div>
+                  <div className="text-[10px] text-[#7a9ab8]">{t('emg_txt')}</div>
+                </div>
+                <button 
+                  onClick={() => window.location.href = 'tel:112'}
+                  className="bg-[#ff3c3c] text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-[#ff3c3c]/20"
+                >📞 112</button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Medical */}
+                <div>
+                  <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-2 px-1 font-mono">🏥 {t('lbl_med')}</div>
+                  <div className="space-y-2">
+                    {EMERGENCY_CONTACTS.filter(c => c.type === 'med').map((c, i) => (
+                      <ContactCard key={i} c={c} t={t} lang={lang} />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Police & Fire */}
+                <div className="grid grid-cols-1 gap-6">
+                  <div>
+                    <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-2 px-1 font-mono">👮 {t('lbl_pol')}</div>
+                    <div className="space-y-2">
+                      {EMERGENCY_CONTACTS.filter(c => c.type === 'pol').map((c, i) => (
+                        <ContactCard key={i} c={c} t={t} lang={lang} />
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-2 px-1 font-mono">🚒 {t('lbl_fire')}</div>
+                    <div className="space-y-2">
+                      {EMERGENCY_CONTACTS.filter(c => c.type === 'fire').map((c, i) => (
+                        <ContactCard key={i} c={c} t={t} lang={lang} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* SAR */}
+                <div>
+                  <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-2 px-1 font-mono">⚓ {t('lbl_sar')}</div>
+                  <div className="space-y-2">
+                    {EMERGENCY_CONTACTS.filter(c => c.type === 'sar').map((c, i) => (
+                      <ContactCard key={i} c={c} t={t} lang={lang} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* PAGE: PETA */}
+          {activePage === 'peta' && (
+            <motion.div key="peta" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
+              <div className="bg-[#121f35] border border-white/5 rounded-2xl overflow-hidden">
+                <div className="p-4 bg-white/5 flex items-center justify-between">
+                  <div className="text-xs font-bold">{lang === 'id' ? 'Peta Gili Trawangan' : 'Gili Trawangan Map'}</div>
+                  <MapPin className="w-4 h-4 text-[#3d9bff]" />
+                </div>
+                <div className="aspect-square relative bg-[#0d1829] flex items-center justify-center overflow-hidden">
+                  <Image 
+                    src="https://picsum.photos/seed/gili-map/800/800" 
+                    alt="Map Placeholder" 
+                    fill
+                    className="object-cover opacity-40"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
+                    <div className="w-14 h-14 bg-[#ff3c3c] rounded-full flex items-center justify-center text-white shadow-[0_0_30px_rgba(255,60,60,0.5)] mb-4 animate-bounce">
+                      <MapPin className="w-7 h-7" />
+                    </div>
+                    <div className="text-sm font-black mb-1 text-white uppercase tracking-tight">{lang === 'id' ? 'Lokasi Anda' : 'Your Location'}</div>
+                    <div className="text-[10px] text-[#7a9ab8] font-mono mb-6 bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm">{coords}</div>
+                    <button 
+                      onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${coords}`, '_blank')}
+                      className="bg-[#3d9bff] text-white px-8 py-4 rounded-2xl text-xs font-black shadow-xl shadow-[#3d9bff]/30 active:scale-95 transition-transform"
+                    >
+                      {lang === 'id' ? 'BUKA GOOGLE MAPS' : 'OPEN GOOGLE MAPS'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-[#121f35] border border-white/5 rounded-2xl p-4">
+                  <div className="text-[10px] text-[#3d6080] font-bold uppercase mb-2 tracking-widest">{lang === 'id' ? 'Titik Evakuasi' : 'Evacuation Point'}</div>
+                  <div className="text-xs font-black text-white">{lang === 'id' ? 'Pelabuhan Utama' : 'Main Harbor'}</div>
+                  <div className="text-[10px] text-[#7a9ab8] mt-1">{lang === 'id' ? 'Sisi Timur Pulau' : 'East Side of Island'}</div>
+                </div>
+                <div className="bg-[#121f35] border border-white/5 rounded-2xl p-4">
+                  <div className="text-[10px] text-[#3d6080] font-bold uppercase mb-2 tracking-widest">{lang === 'id' ? 'Klinik Terdekat' : 'Nearest Clinic'}</div>
+                  <div className="text-xs font-black text-white">{lang === 'id' ? 'Pusat Gili' : 'Gili Center'}</div>
+                  <div className="text-[10px] text-[#7a9ab8] mt-1">{lang === 'id' ? 'Dekat Pasar Seni' : 'Near Art Market'}</div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* PAGE: P3K */}
+          {activePage === 'p3k' && (
+            <motion.div key="p3k" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <div className="space-y-3">
+                {P3K_GUIDES.map((guide) => (
+                  <div key={guide.id} className="bg-[#121f35] border border-white/5 rounded-2xl overflow-hidden">
+                    <div className="p-4 bg-white/5 flex items-center gap-3">
+                      <div className="text-2xl">{guide.icon}</div>
+                      <div>
+                        <div className="text-xs font-bold">{guide.title[lang]}</div>
+                        <div className="flex gap-1 mt-1">
+                          {guide.tags.map(tag => (
+                            <span key={tag} className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-[#7a9ab8]">{tag}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {guide.steps.map((step, i) => (
+                        <div key={step.id} className="flex gap-3">
+                          <div className="w-5 h-5 rounded-full bg-[#18284a] border border-white/10 flex items-center justify-center text-[10px] font-bold shrink-0">{i+1}</div>
+                          <div className="text-[11px] text-[#7a9ab8] leading-relaxed">{step.text[lang]}</div>
+                        </div>
+                      ))}
+                      <div className="bg-[#ffb830]/5 border border-[#ffb830]/20 rounded-xl p-3 text-[10px] text-[#ffb830] flex gap-2">
+                        <span>⚠️</span>
+                        {guide.warning[lang]}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* PAGE: INFO */}
+          {activePage === 'info' && (
+            <motion.div key="info" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+              <div>
+                <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-3 font-mono">📋 {t('lbl_hist')}</div>
+                <div className="bg-[#121f35] border border-white/5 rounded-2xl p-4">
+                  {history.length === 0 ? (
+                    <div className="text-center py-4 text-[11px] text-[#3d6080] font-mono">{t('hist_empty')}</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {history.map((h, i) => (
+                        <div key={i} className="flex gap-3 border-b border-white/5 pb-3 last:border-0 last:pb-0">
+                          <div className="text-lg">🆘</div>
+                          <div>
+                            <div className="text-[11px] font-bold text-[#ff3c3c]">SOS SENT</div>
+                            <div className="text-[9px] text-[#7a9ab8] font-mono mt-1">{h.time} • {h.coords}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+
+              <div className="pt-4 border-t border-white/5 text-center">
+                <div className="text-[11px] font-bold text-[#3d6080] mb-1">{t('lbl_about')}</div>
+                <div className="text-[10px] text-[#7a9ab8] mb-1">{t('ver')}</div>
+                <div className="text-[9px] text-[#3d6080] italic">{t('mission')}</div>
+                <div className="mt-4 text-[9px] text-[#3d6080] uppercase tracking-widest">{t('footer')}</div>
+              </div>
+            </motion.div>
+          )}
+
+        </AnimatePresence>
+      </main>
+
+      {/* Bottom Navigation */}
+      <nav className="flex-shrink-0 bg-[#0d1829]/90 backdrop-blur-xl border-t border-white/5 px-4 py-3 pb-8 flex items-center justify-between z-50 fixed bottom-0 left-0 right-0 max-w-md mx-auto">
+        {[
+          { id: 'beranda', icon: Home, label: t('nav1') },
+          { id: 'kontak', icon: Phone, label: t('nav2') },
+          { id: 'p3k', icon: HeartPulse, label: t('nav3') },
+          { id: 'peta', icon: MapPin, label: t('nav4') },
+          { id: 'info', icon: Settings, label: t('nav5') },
+        ].map((item) => (
+          <button 
+            key={item.id}
+            onClick={() => setActivePage(item.id as Page)}
+            className="flex flex-col items-center gap-1.5 relative group"
+          >
+            <div className={cn(
+              "p-2.5 rounded-2xl transition-all duration-300 relative overflow-hidden",
+              activePage === item.id 
+                ? "bg-[#3d9bff] text-white shadow-lg shadow-[#3d9bff]/20 scale-110" 
+                : "text-[#3d6080] hover:text-[#7a9ab8] hover:bg-white/5"
+            )}>
+              <item.icon className="w-5 h-5 relative z-10" />
+              {activePage === item.id && (
+                <motion.div 
+                  layoutId="nav-glow"
+                  className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent"
+                />
+              )}
+            </div>
+            <span className={cn(
+              "text-[9px] font-black uppercase tracking-widest transition-all duration-300",
+              activePage === item.id ? "text-white opacity-100" : "text-[#3d6080] opacity-60"
+            )}>
+              {item.label}
+            </span>
+          </button>
+        ))}
+      </nav>
+
+      {/* SOS MODAL */}
+      <AnimatePresence>
+        {showSOSModal && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-end justify-center"
+            onClick={() => !countdown && setShowSOSModal(false)}
+          >
+            <motion.div 
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              className="bg-[#0d1829] w-full max-w-md rounded-t-[32px] border-t border-white/10 p-6 pb-12"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-10 h-1 bg-white/10 rounded-full mx-auto mb-6" />
+              <div className="text-4xl mb-4">🆘</div>
+              <h2 className="text-2xl font-black mb-2 text-white uppercase tracking-tight">{t('m_title')}</h2>
+              <p className="text-sm text-[#7a9ab8] leading-relaxed mb-8 font-medium">{t('m_desc')}</p>
+              
+              <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center gap-4 mb-8 text-xs font-mono text-[#00e5b0] shadow-inner">
+                <div className="p-2 bg-[#00e5b0]/10 rounded-xl">
+                  <MapPin className="w-4 h-4" />
+                </div>
+                <div className="flex-1 truncate font-bold tracking-tight">{coords}</div>
+              </div>
+
+              {countdown !== null ? (
+                <div className="mb-8">
+                  <div className="text-center mb-4 text-xs font-black uppercase tracking-[0.2em] text-[#7a9ab8]">
+                    {t('cd_text')}
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <div className="w-24 h-24 rounded-full border-4 border-[#ff3c3c]/20 flex items-center justify-center relative">
+                      <motion.div 
+                        initial={{ pathLength: 1 }}
+                        animate={{ pathLength: 0 }}
+                        transition={{ duration: 3, ease: "linear" }}
+                        className="absolute inset-[-4px] rounded-full border-4 border-[#ff3c3c]"
+                      />
+                      <span className="text-5xl font-black text-[#ff3c3c] drop-shadow-[0_0_10px_rgba(255,60,60,0.5)]">{countdown}</span>
+                    </div>
+                  </div>
+                  <div className="text-center mt-4 text-[10px] font-bold text-[#7a9ab8] uppercase tracking-widest">{t('cd_sec')}</div>
+                  <button 
+                    onClick={() => setCountdown(null)}
+                    className="w-full mt-8 bg-white/5 hover:bg-white/10 text-[#ff3c3c] py-5 rounded-3xl text-xs font-black uppercase tracking-widest transition-all border border-[#ff3c3c]/20"
+                  >{t('m_abort')}</button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <button 
+                    onClick={() => setShowSOSModal(false)}
+                    className="bg-white/5 hover:bg-white/10 text-[#7a9ab8] py-5 rounded-3xl text-xs font-black uppercase tracking-widest transition-all border border-white/5"
+                  >{t('m_cancel')}</button>
+                  <button 
+                    onClick={() => setCountdown(3)}
+                    className="bg-gradient-to-br from-[#ff3c3c] to-[#c81414] text-white py-5 rounded-3xl text-xs font-black uppercase tracking-widest shadow-xl shadow-[#ff3c3c]/30 active:scale-95 transition-all"
+                  >{t('m_call')}</button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* SOS SENT OVERLAY */}
+      <AnimatePresence>
+        {isSOSSent && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/95 z-[200] flex flex-col items-center justify-center p-8 text-center"
+          >
+            <div className="text-6xl mb-6 animate-pulse">🚨</div>
+            <h1 className="text-2xl font-black text-[#ff3c3c] mb-2 uppercase">{t('sent_title')}</h1>
+            <div className="text-5xl font-black font-mono mb-6">{formatTime(sosTimer)}</div>
+            <p className="text-sm text-[#7a9ab8] leading-relaxed mb-8">
+              {lang === 'id' ? 'Sampaikan ke operator: ' : 'Tell operator: '}
+              <strong>{lang === 'id' ? 'nama, lokasi, dan jenis darurat' : 'your name, location & type of emergency'}</strong>.
+              <br /><br />
+              GPS: <span className="font-mono text-[#ddeeff]">{coords}</span>
+            </p>
+            <button 
+              onClick={() => setIsSOSSent(false)}
+              className="bg-[#18284a] border border-white/10 px-8 py-4 rounded-2xl font-bold text-[#7a9ab8]"
+            >{t('sent_close')}</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+    </div>
+  );
+}

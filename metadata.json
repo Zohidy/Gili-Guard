@@ -1,0 +1,5 @@
+{
+  "name": "Gili Guard",
+  "description": "A functional emergency response application for Gili Trawangan, featuring SOS alerts, local emergency contacts, and first aid guides.",
+  "requestFramePermissions": ["geolocation"]
+}
