@@ -18,6 +18,10 @@ export const metadata: Metadata = {
     statusBarStyle: 'black-translucent',
     title: 'Gili Guard',
   },
+  icons: {
+    icon: '/api/icon?size=192',
+    apple: '/api/icon?size=192',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

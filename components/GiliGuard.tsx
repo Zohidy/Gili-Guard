@@ -141,6 +141,10 @@ const STRINGS = {
   link1: { id: 'Jadwal Fastboat', en: 'Fastboat Schedule' },
   link2: { id: 'Peta Interaktif Gili', en: 'Gili Interactive Map' },
   link3: { id: 'Laporan Sampah', en: 'Waste Report' },
+  link4: { id: 'Pajak Turis / Retribusi', en: 'Tourist Tax / Retribusi' },
+  link5: { id: 'Prakiraan Cuaca BMKG', en: 'BMKG Weather Forecast' },
+  link6: { id: 'Gili Eco Trust', en: 'Gili Eco Trust' },
+  link7: { id: 'Panduan Sewa Sepeda', en: 'Bicycle Rental Guide' },
   c10r: { id: 'Penyelamatan Hewan · Gili Trawangan', en: 'Animal Rescue · Gili Trawangan' },
   lbl_animal: { id: 'Darurat Hewan', en: 'Animal Emergency' },
   pwa_title: { id: 'Pasang GiliGuard', en: 'Install GiliGuard' },
@@ -1662,7 +1666,11 @@ export default function GiliGuard() {
                       {[
                         { label: t('link1'), icon: '🚢', url: 'https://gilitransfers.com/fastboat-schedule' },
                         { label: t('link2'), icon: '🗺️', url: 'https://www.google.com/maps/search/Gili+Trawangan' },
-                        { label: t('link3'), icon: '♻️', url: 'https://giliecotrust.com/' }
+                        { label: t('link3'), icon: '♻️', url: 'https://giliecotrust.com/waste-management' },
+                        { label: t('link4'), icon: '🎫', url: 'https://pajak.lombokutarakab.go.id/' },
+                        { label: t('link5'), icon: '🌤️', url: 'https://www.bmkg.go.id/cuaca/prakiraan-cuaca.bmkg?AreaID=501452' },
+                        { label: t('link6'), icon: '🐢', url: 'https://giliecotrust.com/' },
+                        { label: t('link7'), icon: '🚲', url: 'https://www.gili-trawangan.com/bicycles' }
                       ].map((link, i) => (
                         <button 
                           key={i} 
