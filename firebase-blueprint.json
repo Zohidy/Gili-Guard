@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "LostAndFoundItem": {
+      "title": "Lost and Found Item",
+      "description": "An item reported as lost or found in Gili Trawangan",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique ID of the report" },
+        "type": { "type": "string", "enum": ["lost", "found"], "description": "Whether the item is lost or found" },
+        "title": { "type": "string", "description": "Short name of the item" },
+        "description": { "type": "string", "description": "Detailed description of the item" },
+        "location": { "type": "string", "description": "Where it was lost or found" },
+        "contact": { "type": "string", "description": "How to contact the reporter" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the report was made" },
+        "status": { "type": "string", "enum": ["active", "resolved"], "description": "Current status of the report" },
+        "uid": { "type": "string", "description": "User ID of the reporter" }
+      },
+      "required": ["type", "title", "description", "location", "contact", "createdAt", "status", "uid"]
+    }
+  },
+  "firestore": {
+    "/lost_and_found/{itemId}": {
+      "schema": "LostAndFoundItem",
+      "description": "Collection of lost and found items"
+    }
+  }
+}

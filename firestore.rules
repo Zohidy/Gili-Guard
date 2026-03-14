@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: lost_and_found
+    // Document ID: itemId
+    // Fields:
+    //   - type: string ("lost" | "found")
+    //   - title: string
+    //   - description: string
+    //   - location: string
+    //   - contact: string
+    //   - createdAt: string (ISO 8601)
+    //   - status: string ("active" | "resolved")
+    //   - uid: string
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidItem(data) {
+      return data.type in ['lost', 'found'] &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.description is string && data.description.size() > 0 && data.description.size() < 1000 &&
+             data.location is string && data.location.size() > 0 && data.location.size() < 200 &&
+             data.contact is string && data.contact.size() > 0 && data.contact.size() < 200 &&
+             data.status in ['active', 'resolved'] &&
+             data.uid is string &&
+             data.createdAt is string;
+    }
+
+    match /lost_and_found/{itemId} {
+      allow read: if true; // Publicly readable
+      allow create: if isAuthenticated() && 
+                      isValidItem(request.resource.data) && 
+                      request.resource.data.uid == request.auth.uid &&
+                      request.resource.data.status == 'active';
+      allow update: if isOwner(resource.data.uid) && 
+                      isValidItem(request.resource.data) &&
+                      request.resource.data.uid == resource.data.uid;
+      allow delete: if isOwner(resource.data.uid);
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}
