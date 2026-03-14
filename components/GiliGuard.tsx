@@ -7,7 +7,8 @@ import {
   Info, Navigation, Anchor, LifeBuoy, Home, 
   Settings, Cloud, Wind, Waves, RefreshCw, X, CheckCircle2,
   Droplets, Thermometer, Sun, CloudSun, CloudRain, 
-  CloudLightning, CloudFog, CloudDrizzle
+  CloudLightning, CloudFog, CloudDrizzle, ExternalLink,
+  Smartphone, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
@@ -82,7 +83,21 @@ const STRINGS = {
   lbl_sar: { id: 'SAR & Evakuasi', en: 'SAR & Evacuation' },
   lbl_hist: { id: 'Riwayat SOS', en: 'SOS History' },
   lbl_about: { id: 'Tentang', en: 'About' },
-  ver: { id: 'Versi 2.0 – Bilingual', en: 'Version 2.0 – Bilingual' },
+  lbl_rules: { id: 'Aturan Gili', en: 'Gili Rules' },
+  lbl_links: { id: 'Tautan Berguna', en: 'Useful Links' },
+  rule1: { id: '🚫 Tanpa Kendaraan Bermotor', en: '🚫 No Motorized Vehicles' },
+  rule2: { id: '👕 Berpakaian Sopan di Desa', en: '👕 Dress Modestly in Village' },
+  rule3: { id: '🐢 Jangan Sentuh Penyu', en: '🐢 Do Not Touch Turtles' },
+  rule4: { id: '💧 Hemat Air Tawar', en: '💧 Conserve Fresh Water' },
+  link1: { id: 'Jadwal Fastboat', en: 'Fastboat Schedule' },
+  link2: { id: 'Peta Interaktif Gili', en: 'Gili Interactive Map' },
+  link3: { id: 'Laporan Sampah', en: 'Waste Report' },
+  c10r: { id: 'Penyelamatan Hewan · Gili Trawangan', en: 'Animal Rescue · Gili Trawangan' },
+  lbl_animal: { id: 'Darurat Hewan', en: 'Animal Emergency' },
+  pwa_title: { id: 'Pasang GiliGuard', en: 'Install GiliGuard' },
+  pwa_desc: { id: 'Akses cepat fitur darurat langsung dari layar utama Anda, bahkan saat offline.', en: 'Quick access to emergency features directly from your home screen, even offline.' },
+  pwa_btn: { id: 'Pasang Sekarang', en: 'Install Now' },
+  ver: { id: 'Versi 2.2 – Ultra Comprehensive', en: 'Version 2.2 – Ultra Comprehensive' },
   mission: { id: 'Dibuat untuk keselamatan Gili · Gratis selamanya', en: 'Built for Gili safety · Free forever' },
   footer: { id: 'Untuk wisatawan & warga lokal · Gili Trawangan, NTB', en: 'Built for tourists & locals · Gili Trawangan, NTB' },
 };
@@ -110,6 +125,94 @@ const P3K_GUIDES = [
       { id: 's2', text: { id: 'Bilas dengan air laut (bukan air tawar). Siram cuka jika ada.', en: 'Rinse with seawater (NOT fresh water). Use vinegar if available.' } }
     ],
     warning: { id: 'Jika sesak napas atau bengkak parah — segera ke klinik!', en: 'If shortness of breath or severe swelling — go to clinic!' }
+  },
+  {
+    id: 'p3',
+    icon: '☀️',
+    title: { id: 'Heatstroke / Kelelahan Panas', en: 'Heatstroke / Heat Exhaustion' },
+    tags: ['SERIUS', 'DARAT'],
+    steps: [
+      { id: 's1', text: { id: 'Pindahkan ke tempat teduh dan dingin. Lepaskan pakaian berlebih.', en: 'Move to a cool, shaded area. Remove excess clothing.' } },
+      { id: 's2', text: { id: 'Dinginkan tubuh dengan handuk basah atau air. Beri minum jika sadar.', en: 'Cool the body with wet towels or water. Give water if conscious.' } }
+    ],
+    warning: { id: 'Jika suhu tubuh sangat tinggi atau pingsan, ini darurat medis!', en: 'If body temperature is very high or unconscious, this is a medical emergency!' }
+  },
+  {
+    id: 'p4',
+    icon: '🚲',
+    title: { id: 'Luka Jatuh / Pendarahan', en: 'Cuts / Bleeding' },
+    tags: ['UMUM', 'DARAT'],
+    steps: [
+      { id: 's1', text: { id: 'Tekan luka dengan kain bersih selama 5-10 menit untuk menghentikan darah.', en: 'Apply pressure to the wound with a clean cloth for 5-10 minutes to stop bleeding.' } },
+      { id: 's2', text: { id: 'Bersihkan dengan air mengalir. Gunakan antiseptik jika tersedia.', en: 'Clean with running water. Use antiseptic if available.' } }
+    ],
+    warning: { id: 'Luka dalam atau kotor butuh suntikan tetanus di klinik.', en: 'Deep or dirty wounds need a tetanus shot at the clinic.' }
+  },
+  {
+    id: 'p5',
+    icon: '🐈',
+    title: { id: 'Darurat Hewan (Kucing/Anjing)', en: 'Animal Emergency (Cat/Dog)' },
+    tags: ['HEWAN', 'LUNI'],
+    steps: [
+      { id: 's1', text: { id: 'Jangan panik. Dekati hewan dengan tenang agar tidak digigit/dicakar.', en: 'Do not panic. Approach the animal calmly to avoid being bitten/scratched.' } },
+      { id: 's2', text: { id: 'Jika terluka, bungkus dengan kain lembut. Hubungi LUNI Lombok segera.', en: 'If injured, wrap in a soft cloth. Contact LUNI Lombok immediately.' } }
+    ],
+    warning: { id: 'LUNI Lombok adalah satu-satunya penyelamat hewan di Gili T.', en: 'LUNI Lombok is the only animal rescue on Gili T.' }
+  },
+  {
+    id: 'p6',
+    icon: '🦴',
+    title: { id: 'Patah Tulang / Keseleo', en: 'Fracture / Sprain' },
+    tags: ['SERIUS', 'DARAT'],
+    steps: [
+      { id: 's1', text: { id: 'Jangan gerakkan bagian yang cedera. Gunakan bidai (kayu/papan) jika harus pindah.', en: 'Do not move the injured part. Use a splint (wood/board) if you must move.' } },
+      { id: 's2', text: { id: 'Kompres dingin untuk kurangi bengkak. Jangan urut/pijat paksa.', en: 'Apply cold compress to reduce swelling. Do not massage or force movement.' } }
+    ],
+    warning: { id: 'Segera ke klinik untuk Rontgen/X-Ray.', en: 'Go to the clinic immediately for an X-Ray.' }
+  },
+  {
+    id: 'p7',
+    icon: '😵',
+    title: { id: 'Pingsan / Tidak Sadar', en: 'Fainting / Unconscious' },
+    tags: ['KRITIS', 'UMUM'],
+    steps: [
+      { id: 's1', text: { id: 'Baringkan korban, angkat kaki lebih tinggi dari jantung (30cm).', en: 'Lay the victim down, raise legs higher than the heart (30cm).' } },
+      { id: 's2', text: { id: 'Longgarkan pakaian. Beri udara segar. Jangan beri minum saat pingsan.', en: 'Loosen clothing. Provide fresh air. Do not give water while unconscious.' } }
+    ],
+    warning: { id: 'Jika tidak bangun dalam 1 menit, hubungi ambulans!', en: 'If they do not wake up within 1 minute, call an ambulance!' }
+  },
+  {
+    id: 'p8',
+    icon: '🥨',
+    title: { id: 'Tersedak', en: 'Choking' },
+    tags: ['KRITIS', 'UMUM'],
+    steps: [
+      { id: 's1', text: { id: 'Minta korban batuk keras. Jika gagal, lakukan Maneuver Heimlich.', en: 'Ask the victim to cough hard. If it fails, perform the Heimlich Maneuver.' } },
+      { id: 's2', text: { id: 'Tekan perut di atas pusar dengan kepalan tangan ke arah atas.', en: 'Apply abdominal thrusts above the navel with a fist in an upward motion.' } }
+    ],
+    warning: { id: 'Jika pingsan, segera lakukan CPR!', en: 'If they pass out, start CPR immediately!' }
+  },
+  {
+    id: 'p9',
+    icon: '🤢',
+    title: { id: 'Keracunan Makanan', en: 'Food Poisoning' },
+    tags: ['SEDANG', 'UMUM'],
+    steps: [
+      { id: 's1', text: { id: 'Minum banyak air putih atau oralit untuk cegah dehidrasi.', en: 'Drink plenty of water or ORS to prevent dehydration.' } },
+      { id: 's2', text: { id: 'Istirahat total. Hindari makanan padat sementara.', en: 'Full rest. Avoid solid foods temporarily.' } }
+    ],
+    warning: { id: 'Jika muntah darah atau diare parah, segera ke klinik!', en: 'If vomiting blood or severe diarrhea, go to the clinic immediately!' }
+  },
+  {
+    id: 'p10',
+    icon: '🔥',
+    title: { id: 'Luka Bakar', en: 'Burns' },
+    tags: ['SEDANG', 'UMUM'],
+    steps: [
+      { id: 's1', text: { id: 'Siram dengan air mengalir (suhu ruang) selama 20 menit. Jangan pakai es.', en: 'Rinse with running water (room temp) for 20 minutes. Do not use ice.' } },
+      { id: 's2', text: { id: 'Tutup longgar dengan plastik wrapping bersih atau kain steril.', en: 'Cover loosely with clean plastic wrap or sterile cloth.' } }
+    ],
+    warning: { id: 'Jangan pecahkan lepuhan. Jangan oleskan odol/mentega.', en: 'Do not pop blisters. Do not apply toothpaste or butter.' }
   }
 ];
 
@@ -117,6 +220,7 @@ const EMERGENCY_CONTACTS = [
   { name: 'Prima Medika Gili', role: 'c1r', num: '+6285186678911', icon: '🏥', type: 'med' },
   { name: 'Blue Island Medical', role: 'c7r', num: '+6281997733332', icon: '🏥', type: 'med' },
   { name: 'Warna Medica Gili', role: 'c2r', num: '+6287862060247', icon: '🏥', type: 'med' },
+  { name: 'LUNI Lombok (Animal)', role: 'c10r', num: '+6281239495308', icon: '🐈', type: 'med' },
   { name: 'Klinik Gili Trawangan', role: 'c6r', num: '+6281997733331', icon: '🏥', type: 'med' },
   { name: 'Polisi Gili Indah', role: 'c4r', num: '+6281917444441', icon: '👮', type: 'pol' },
   { name: 'Damkar Gili Trawangan', role: 'c9r', num: '+6281917444441', icon: '🚒', type: 'fire' },
@@ -150,7 +254,7 @@ const ContactCard = ({ c, t, lang }: { c: any, t: any, lang: Lang }) => (
   <motion.div 
     whileHover={{ scale: 1.02 }}
     whileTap={{ scale: 0.98 }}
-    className="bg-white/[0.03] border border-white/[0.05] rounded-2xl p-4 flex items-center gap-4 hover:bg-white/[0.06] transition-all group relative overflow-hidden"
+    className="bg-gradient-to-br from-white/[0.06] to-white/[0.01] border border-white/[0.08] rounded-2xl p-4 flex items-center gap-4 hover:bg-white/[0.08] transition-all group relative overflow-hidden"
   >
     <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-transparent via-[#3d9bff] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
     <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-2xl group-hover:rotate-6 transition-transform shadow-inner">{c.icon}</div>
@@ -264,6 +368,7 @@ export default function GiliGuard() {
   const [coords, setCoords] = useState<string>('--');
   const [history, setHistory] = useState<{ time: string, coords: string }[]>([]);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
   // Weather state moved to main component
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -364,6 +469,16 @@ export default function GiliGuard() {
     }
   };
 
+  // Show install prompt after 10 seconds if available
+  useEffect(() => {
+    if (deferredPrompt) {
+      const timer = setTimeout(() => {
+        setShowInstallPrompt(true);
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [deferredPrompt]);
+
   // GPS Tracking
   useEffect(() => {
     if (typeof window === 'undefined' || !navigator.geolocation) return;
@@ -418,11 +533,24 @@ export default function GiliGuard() {
     <div className="max-w-md mx-auto h-[100dvh] bg-[#080f1e] text-[#ddeeff] flex flex-col relative overflow-hidden">
       
       {/* Header */}
-      <header className="flex-shrink-0 bg-[#0d1829]/80 backdrop-blur-md border-b border-white/5 p-4 pt-8 flex items-center gap-3 z-30 sticky top-0">
-        <div className="w-10 h-10 bg-gradient-to-br from-[#ff3c3c] to-[#c81414] rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-[#ff3c3c]/20 border border-white/10">🆘</div>
+      <header className="flex-shrink-0 bg-[#0d1829]/90 backdrop-blur-xl border-b border-white/10 p-4 pt-10 flex items-center gap-4 z-30 sticky top-0 shadow-2xl shadow-black/20">
+        <div className="relative group">
+          <div className="absolute -inset-1 bg-gradient-to-tr from-[#ff3c3c] to-[#3d9bff] rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+          <div className="relative w-11 h-11 bg-[#0d1829] border border-white/10 rounded-2xl flex items-center justify-center text-[#ff3c3c] shadow-xl overflow-hidden">
+            <Shield className="w-6 h-6 fill-[#ff3c3c]/10" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#ff3c3c]/10 to-transparent pointer-events-none" />
+          </div>
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-black tracking-tight text-white uppercase">{t('htitle')}</div>
-          <div className="text-[9px] text-[#7a9ab8] font-mono truncate tracking-tight opacity-60">{coords}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-base font-black tracking-tighter text-white uppercase italic">Gili</span>
+            <span className="text-base font-black tracking-tighter text-[#3d9bff] uppercase italic">Guard</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-[#00e5b0] animate-pulse ml-1" />
+          </div>
+          <div className="text-[10px] text-[#7a9ab8] font-bold uppercase tracking-[0.2em] opacity-60 flex items-center gap-1.5">
+            <MapPin className="w-2.5 h-2.5" />
+            {coords}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex bg-white/5 border border-white/5 rounded-xl overflow-hidden p-0.5">
@@ -698,6 +826,36 @@ export default function GiliGuard() {
                 </div>
               </div>
 
+              <div>
+                <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-3 font-mono">📜 {t('lbl_rules')}</div>
+                <div className="grid grid-cols-1 gap-2">
+                  {[t('rule1'), t('rule2'), t('rule3'), t('rule4')].map((rule, i) => (
+                    <div key={i} className="bg-[#121f35] border border-white/5 rounded-xl p-3 text-[11px] text-[#7a9ab8] flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#3d9bff]/40" />
+                      {rule}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-3 font-mono">🔗 {t('lbl_links')}</div>
+                <div className="space-y-2">
+                  {[
+                    { label: t('link1'), icon: '🚢' },
+                    { label: t('link2'), icon: '🗺️' },
+                    { label: t('link3'), icon: '♻️' }
+                  ].map((link, i) => (
+                    <button key={i} className="w-full bg-[#121f35] border border-white/5 rounded-xl p-3 text-[11px] text-[#7a9ab8] flex items-center justify-between hover:bg-white/5 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <span>{link.icon}</span>
+                        {link.label}
+                      </div>
+                      <ExternalLink className="w-3 h-3 opacity-40" />
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div className="pt-4 border-t border-white/5 text-center">
                 <div className="text-[11px] font-bold text-[#3d6080] mb-1">{t('lbl_about')}</div>
@@ -833,6 +991,42 @@ export default function GiliGuard() {
               onClick={() => setIsSOSSent(false)}
               className="bg-[#18284a] border border-white/10 px-8 py-4 rounded-2xl font-bold text-[#7a9ab8]"
             >{t('sent_close')}</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* PWA INSTALL PROMPT */}
+      <AnimatePresence>
+        {showInstallPrompt && deferredPrompt && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-24 left-4 right-4 bg-[#1a2a44] border border-[#3d9bff]/30 rounded-3xl p-5 z-[80] shadow-2xl shadow-black/50"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-[#3d9bff]/20 rounded-2xl flex items-center justify-center text-[#3d9bff] border border-[#3d9bff]/20">
+                <Shield className="w-6 h-6 fill-[#3d9bff]/10" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-black text-white uppercase tracking-tight mb-1">{t('pwa_title')}</h3>
+                <p className="text-[11px] text-[#7a9ab8] leading-tight mb-4">{t('pwa_desc')}</p>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setShowInstallPrompt(false)}
+                    className="flex-1 bg-white/5 hover:bg-white/10 text-[#7a9ab8] py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                  >{t('m_cancel')}</button>
+                  <button 
+                    onClick={() => {
+                      handleInstall();
+                      setShowInstallPrompt(false);
+                    }}
+                    className="flex-1 bg-[#3d9bff] text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#3d9bff]/20 active:scale-95 transition-all"
+                  >{t('pwa_btn')}</button>
+                </div>
+              </div>
+              <button onClick={() => setShowInstallPrompt(false)} className="text-[#3d6080] hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
