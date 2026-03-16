@@ -36,7 +36,7 @@ service cloud.firestore {
              data.contact is string && data.contact.size() > 0 && data.contact.size() < 200 &&
              data.status in ['active', 'resolved'] &&
              data.uid is string &&
-             data.createdAt is string;
+             data.createdAt is timestamp;
     }
 
     match /lost_and_found/{itemId} {

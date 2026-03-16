@@ -9,7 +9,7 @@ import {
   Droplets, Thermometer, Sun, CloudSun, CloudRain, 
   CloudLightning, CloudFog, CloudDrizzle, ExternalLink,
   Smartphone, Download, Search, Plus, MessageSquare, Trash2,
-  Instagram, Linkedin, Github, Mail, Package, MoreHorizontal
+  Instagram, Linkedin, Github, Mail, Package, MoreHorizontal, Share2, LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
@@ -134,6 +134,10 @@ const STRINGS = {
   lbl_settings: { id: 'Pengaturan & Bahasa', en: 'Settings & Language' },
   lbl_peta: { id: 'Peta Pulau', en: 'Island Map' },
   lbl_lang: { id: 'Pilih Bahasa', en: 'Select Language' },
+  lbl_notif: { id: 'Notifikasi Push', en: 'Push Notifications' },
+  lbl_loc: { id: 'Layanan Lokasi', en: 'Location Services' },
+  lbl_data: { id: 'Penghemat Data', en: 'Data Saver' },
+  lbl_app_settings: { id: 'Pengaturan Aplikasi', en: 'App Settings' },
   rule1: { id: '🚫 Tanpa Kendaraan Bermotor', en: '🚫 No Motorized Vehicles' },
   rule2: { id: '👕 Berpakaian Sopan di Desa', en: '👕 Dress Modestly in Village' },
   rule3: { id: '🐢 Jangan Sentuh Penyu', en: '🐢 Do Not Touch Turtles' },
@@ -170,6 +174,10 @@ const STRINGS = {
   about_dev: { id: 'Dikembangkan dengan ❤️ untuk Gili Trawangan.', en: 'Developed with ❤️ for Gili Trawangan.' },
   lbl_legal: { id: 'Legal & Privasi', en: 'Legal & Privacy' },
   lbl_dev: { id: 'Profil Pengembang', en: 'Developer Profile' },
+  lbl_feedback: { id: 'Kirim Masukan', en: 'Send Feedback' },
+  feedback_desc: { id: 'Bantu kami meningkatkan GiliGuard. Kirimkan saran, laporan bug, atau ide fitur baru langsung ke pengembang.', en: 'Help us improve GiliGuard. Send suggestions, bug reports, or new feature ideas directly to the developer.' },
+  feedback_btn: { id: 'Kirim via Email', en: 'Send via Email' },
+  feedback_btn_wa: { id: 'Kirim via WhatsApp', en: 'Send via WhatsApp' },
   dev_name: { id: 'Zohidy', en: 'Zohidy' },
   dev_role: { id: 'Full-stack Developer & Gili Enthusiast', en: 'Full-stack Developer & Gili Enthusiast' },
   dev_desc: { id: 'Membangun solusi digital untuk dampak sosial dan keselamatan komunitas.', en: 'Building digital solutions for social impact and community safety.' },
@@ -451,6 +459,7 @@ export default function GiliGuard() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [p3kSearch, setP3kSearch] = useState('');
+  const [mapQuery, setMapQuery] = useState('');
 
   // AI Chat state
   const [showAiChat, setShowAiChat] = useState(false);
@@ -458,6 +467,13 @@ export default function GiliGuard() {
   const [aiInput, setAiInput] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // App Settings state
+  const [appSettings, setAppSettings] = useState({
+    notifications: true,
+    location: true,
+    dataSaver: false
+  });
 
   useEffect(() => {
     if (showAiChat) {
@@ -681,7 +697,15 @@ export default function GiliGuard() {
     setIsSOSSent(true);
     setSosTimer(0);
     setHistory(prev => [{ time: new Date().toLocaleTimeString(), coords }, ...prev]);
-    window.location.href = 'tel:112';
+    
+    const waNumber = '6285293514808';
+    const mapsLink = `https://www.google.com/maps/search/?api=1&query=${coords}`;
+    const message = encodeURIComponent(`🚨 DARURAT! SAYA BUTUH BANTUAN DI GILI TRAWANGAN 🚨\n\nLokasi saya saat ini:\n${mapsLink}\n\nKoordinat: ${coords}`);
+    window.open(`https://wa.me/${waNumber}?text=${message}`, '_blank');
+    
+    setTimeout(() => {
+      window.location.href = 'tel:112';
+    }, 1500);
   }, [coords]);
 
   // SOS Countdown Logic
@@ -828,29 +852,54 @@ export default function GiliGuard() {
 
               {/* Weather Widget (Compact) */}
               <div 
-                onClick={() => setActivePage('info')} // Or a dedicated weather page if we had one
-                className="bg-gradient-to-br from-[#121f35] to-[#0d1829] border border-white/5 rounded-[2rem] p-5 flex items-center justify-between shadow-xl group cursor-pointer hover:border-[#3d9bff]/30 transition-all"
+                onClick={() => setActivePage('info')}
+                className="bg-gradient-to-br from-[#121f35] to-[#0d1829] border border-white/5 rounded-[2rem] p-5 flex flex-col gap-4 shadow-xl group cursor-pointer hover:border-[#3d9bff]/30 transition-all"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center">
-                    {weather ? (
-                      <div className="text-2xl">
-                        {weather.weatherCode === 0 ? '☀️' : weather.weatherCode < 3 ? '⛅' : weather.weatherCode < 50 ? '☁️' : '🌧️'}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center">
+                      {weather ? (
+                        <div className="text-2xl">
+                          {weather.weatherCode === 0 ? '☀️' : weather.weatherCode < 3 ? '⛅' : weather.weatherCode < 50 ? '☁️' : '🌧️'}
+                        </div>
+                      ) : (
+                        <RefreshCw className="w-5 h-5 text-[#3d6080] animate-spin" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-[#3d6080] font-black uppercase tracking-widest mb-0.5">{t('lbl_cur_weather')}</div>
+                      <div className="text-sm font-bold text-white">
+                        {weather ? `${Math.round(weather.temp)}°C • ${WEATHER_DESCRIPTIONS[weather.weatherCode]?.[lang] || '...'}` : 'Loading...'}
                       </div>
-                    ) : (
-                      <RefreshCw className="w-5 h-5 text-[#3d6080] animate-spin" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-[#3d6080] font-black uppercase tracking-widest mb-0.5">{t('lbl_cur_weather')}</div>
-                    <div className="text-sm font-bold text-white">
-                      {weather ? `${Math.round(weather.temp)}°C • ${WEATHER_DESCRIPTIONS[weather.weatherCode]?.[lang] || '...'}` : 'Loading...'}
                     </div>
                   </div>
+                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-[#3d9bff]/10 transition-colors">
+                    <Navigation className="w-4 h-4 text-[#3d6080] group-hover:text-[#3d9bff] rotate-90" />
+                  </div>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-[#3d9bff]/10 transition-colors">
-                  <Navigation className="w-4 h-4 text-[#3d6080] group-hover:text-[#3d9bff] rotate-90" />
-                </div>
+
+                {/* Tide & Wave Info */}
+                {weather && (
+                  <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                    <div className="flex items-center gap-1.5 bg-[#3d9bff]/10 px-3 py-1.5 rounded-lg">
+                      <Waves className="w-3.5 h-3.5 text-[#3d9bff]" />
+                      <span className="text-[10px] font-bold text-[#3d9bff]">
+                        {weather.waveHeight?.toFixed(1) || '--'}m {lang === 'id' ? 'Ombak' : 'Waves'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-[#00e5b0]/10 px-3 py-1.5 rounded-lg">
+                      <Droplets className="w-3.5 h-3.5 text-[#00e5b0]" />
+                      <span className="text-[10px] font-bold text-[#00e5b0]">
+                        {(() => {
+                          const h = new Date().getHours();
+                          if ((h >= 8 && h <= 12) || (h >= 20 || h <= 0)) return lang === 'id' ? 'Pasang Naik' : 'High Tide';
+                          if ((h >= 14 && h <= 18) || (h >= 2 && h <= 6)) return lang === 'id' ? 'Surut' : 'Low Tide';
+                          return lang === 'id' ? 'Transisi' : 'Transition';
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* SOS Button Section */}
@@ -875,7 +924,22 @@ export default function GiliGuard() {
                     <div className="text-[10px] text-white/80 font-black uppercase tracking-[0.2em]">{t('sos_sub')}</div>
                   </button>
                 </div>
-                <div className="text-[10px] text-[#3d6080] font-black uppercase tracking-widest text-center max-w-[200px] leading-relaxed opacity-60">{t('sos_hint')}</div>
+                <div className="text-[10px] text-[#3d6080] font-black uppercase tracking-widest text-center max-w-[200px] leading-relaxed opacity-60 mb-2">{t('sos_hint')}</div>
+                <button 
+                  onClick={() => {
+                    const mapsLink = `https://www.google.com/maps/search/?api=1&query=${coords}`;
+                    const text = lang === 'id' ? `Posisi saya saat ini di Gili Trawangan: ${mapsLink}` : `My current location in Gili Trawangan: ${mapsLink}`;
+                    if (navigator.share) {
+                      navigator.share({ title: 'Lokasi Saya / My Location', text, url: mapsLink }).catch(() => {});
+                    } else {
+                      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                    }
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-[#121f35] border border-white/10 rounded-full text-xs font-bold text-[#3d9bff] hover:bg-[#3d9bff]/10 transition-colors active:scale-95 shadow-lg"
+                >
+                  <Share2 className="w-4 h-4" />
+                  {lang === 'id' ? 'Bagikan Lokasi Saya' : 'Share My Location'}
+                </button>
               </div>
 
               {/* Quick Actions Grid */}
@@ -902,6 +966,40 @@ export default function GiliGuard() {
                       <div className="text-2xl drop-shadow-md">{item.icon}</div>
                       <div className="text-[10px] font-black text-[#7a9ab8] text-center leading-tight uppercase tracking-tight">{item.label}</div>
                     </motion.button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Local Quick Dial */}
+              <div>
+                <div className="text-[11px] font-black text-[#3d6080] uppercase tracking-[0.2em] mb-4 px-1 font-mono flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-[1px] bg-[#3d6080]/30" />
+                    {lang === 'id' ? 'PANGGILAN CEPAT LOKAL' : 'LOCAL QUICK DIAL'}
+                  </div>
+                  <button onClick={() => setActivePage('kontak')} className="text-[#3d9bff] text-[10px] uppercase tracking-widest hover:underline">
+                    {lang === 'id' ? 'Lihat Semua' : 'See All'}
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {EMERGENCY_CONTACTS.filter(c => ['Prima Medika Gili', 'Polisi Gili Indah', 'Damkar Gili Trawangan'].includes(c.name)).map((c, i) => (
+                    <div key={i} className="bg-[#121f35] border border-white/5 rounded-2xl p-4 flex items-center justify-between group hover:border-[#3d9bff]/30 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-2xl">
+                          {c.icon}
+                        </div>
+                        <div>
+                          <div className="text-[11px] font-black text-white uppercase tracking-tight mb-1">{c.name}</div>
+                          <div className="text-[10px] text-[#7a9ab8] font-bold font-mono">{c.num}</div>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => window.location.href = `tel:${c.num}`}
+                        className="w-10 h-10 rounded-full bg-[#00e5b0]/10 text-[#00e5b0] flex items-center justify-center hover:bg-[#00e5b0] hover:text-[#080f1e] transition-colors active:scale-95"
+                      >
+                        <Phone className="w-4 h-4" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1086,41 +1184,71 @@ export default function GiliGuard() {
                   <div className="text-xs font-bold">{lang === 'id' ? 'Peta Gili Trawangan' : 'Gili Trawangan Map'}</div>
                   <MapPin className="w-4 h-4 text-[#3d9bff]" />
                 </div>
-                <div className="aspect-square relative bg-[#0d1829] flex items-center justify-center overflow-hidden">
-                  <Image 
-                    src="https://picsum.photos/seed/gili-map/800/800" 
-                    alt="Map Placeholder" 
-                    fill
-                    className="object-cover opacity-40"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-                    <div className="w-14 h-14 bg-[#ff3c3c] rounded-full flex items-center justify-center text-white shadow-[0_0_30px_rgba(255,60,60,0.5)] mb-4 animate-bounce">
-                      <MapPin className="w-7 h-7" />
-                    </div>
-                    <div className="text-sm font-black mb-1 text-white uppercase tracking-tight">{lang === 'id' ? 'Lokasi Anda' : 'Your Location'}</div>
-                    <div className="text-[10px] text-[#7a9ab8] font-mono mb-6 bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm">{coords}</div>
-                    <button 
-                      onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${coords}`, '_blank')}
-                      className="bg-[#3d9bff] text-white px-8 py-4 rounded-2xl text-xs font-black shadow-xl shadow-[#3d9bff]/30 active:scale-95 transition-transform"
+                {/* Map Filters */}
+                <div className="px-4 pb-4 bg-white/5 flex gap-2 overflow-x-auto no-scrollbar">
+                  {[
+                    { id: '', label: lang === 'id' ? 'Lokasi Saya' : 'My Location', icon: '📍' },
+                    { id: 'Klinik Gili Trawangan', label: 'Klinik', icon: '🏥' },
+                    { id: 'Polisi Gili Trawangan', label: 'Polisi', icon: '👮' },
+                    { id: 'Apotek Gili Trawangan', label: 'Apotek', icon: '💊' },
+                    { id: 'Pelabuhan Gili Trawangan', label: 'Pelabuhan', icon: '⚓' },
+                  ].map(filter => (
+                    <button
+                      key={filter.id}
+                      onClick={() => setMapQuery(filter.id)}
+                      className={cn(
+                        "whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1.5",
+                        mapQuery === filter.id ? "bg-[#3d9bff] text-white" : "bg-white/10 text-[#7a9ab8] hover:bg-white/20"
+                      )}
                     >
-                      {lang === 'id' ? 'BUKA GOOGLE MAPS' : 'OPEN GOOGLE MAPS'}
+                      <span>{filter.icon}</span>
+                      {filter.label}
                     </button>
-                  </div>
+                  ))}
+                </div>
+                <div className="aspect-square relative bg-[#0d1829] flex items-center justify-center overflow-hidden">
+                  <iframe 
+                    src={`https://maps.google.com/maps?q=${mapQuery || (coords === '--' ? 'Gili Trawangan, NTB' : coords)}&z=15&output=embed`}
+                    width="100%" 
+                    height="100%" 
+                    style={{ border: 0 }} 
+                    allowFullScreen 
+                    loading="lazy" 
+                    referrerPolicy="no-referrer-when-downgrade"
+                    className="absolute inset-0"
+                  />
+                  {!mapQuery && (
+                    <div className="absolute bottom-4 left-4 right-4 flex flex-col items-center justify-center p-4 text-center bg-[#0d1829]/80 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl pointer-events-none">
+                      <div className="text-sm font-black mb-1 text-white uppercase tracking-tight">{lang === 'id' ? 'Lokasi Anda' : 'Your Location'}</div>
+                      <div className="text-[10px] text-[#00e5b0] font-mono mb-3 px-3 py-1 rounded-full bg-[#00e5b0]/10">{coords}</div>
+                      <button 
+                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${coords}`, '_blank')}
+                        className="bg-[#3d9bff] text-white px-6 py-3 rounded-xl text-xs font-black shadow-xl shadow-[#3d9bff]/30 active:scale-95 transition-transform pointer-events-auto w-full"
+                      >
+                        {lang === 'id' ? 'BUKA DI APLIKASI MAPS' : 'OPEN IN MAPS APP'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-[#121f35] border border-white/5 rounded-2xl p-4">
+                <button 
+                  onClick={() => setMapQuery('Pelabuhan Gili Trawangan')}
+                  className="bg-[#121f35] border border-white/5 rounded-2xl p-4 text-left hover:border-[#3d9bff]/30 transition-colors active:scale-95"
+                >
                   <div className="text-[10px] text-[#3d6080] font-bold uppercase mb-2 tracking-widest">{lang === 'id' ? 'Titik Evakuasi' : 'Evacuation Point'}</div>
                   <div className="text-xs font-black text-white">{lang === 'id' ? 'Pelabuhan Utama' : 'Main Harbor'}</div>
                   <div className="text-[10px] text-[#7a9ab8] mt-1">{lang === 'id' ? 'Sisi Timur Pulau' : 'East Side of Island'}</div>
-                </div>
-                <div className="bg-[#121f35] border border-white/5 rounded-2xl p-4">
+                </button>
+                <button 
+                  onClick={() => setMapQuery('Klinik Gili Trawangan')}
+                  className="bg-[#121f35] border border-white/5 rounded-2xl p-4 text-left hover:border-[#3d9bff]/30 transition-colors active:scale-95"
+                >
                   <div className="text-[10px] text-[#3d6080] font-bold uppercase mb-2 tracking-widest">{lang === 'id' ? 'Klinik Terdekat' : 'Nearest Clinic'}</div>
                   <div className="text-xs font-black text-white">{lang === 'id' ? 'Pusat Gili' : 'Gili Center'}</div>
                   <div className="text-[10px] text-[#7a9ab8] mt-1">{lang === 'id' ? 'Dekat Pasar Seni' : 'Near Art Market'}</div>
-                </div>
+                </button>
               </div>
 
               <div className="space-y-3">
@@ -1131,7 +1259,11 @@ export default function GiliGuard() {
                   { name: 'Villa Almarik', type: 'Hotel', dist: '1.2km', icon: '🏨' },
                   { name: 'Blue Marlin Dive', type: 'Dive', dist: '300m', icon: '🤿' },
                 ].map((f, i) => (
-                  <div key={i} className="bg-[#121f35] border border-white/5 rounded-2xl p-4 flex items-center justify-between group active:scale-[0.98] transition-all">
+                  <div 
+                    key={i} 
+                    onClick={() => setMapQuery(f.name)}
+                    className="bg-[#121f35] border border-white/5 rounded-2xl p-4 flex items-center justify-between group cursor-pointer hover:border-[#3d9bff]/30 active:scale-[0.98] transition-all"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-lg">{f.icon}</div>
                       <div>
@@ -1140,7 +1272,10 @@ export default function GiliGuard() {
                       </div>
                     </div>
                     <button 
-                      onClick={() => window.open(`https://www.google.com/maps/search/${encodeURIComponent(f.name)}`, '_blank')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(`https://www.google.com/maps/search/${encodeURIComponent(f.name)}`, '_blank');
+                      }}
                       className="p-2 bg-white/5 rounded-lg text-[#3d9bff] group-hover:bg-[#3d9bff] group-hover:text-white transition-all"
                     >
                       <Navigation className="w-4 h-4" />
@@ -1261,6 +1396,14 @@ export default function GiliGuard() {
                     <div ref={messagesEndRef} />
                   </div>
                   
+                  <div className="bg-[#ffb830]/10 border-t border-[#ffb830]/20 p-2.5 text-center">
+                    <p className="text-[9px] text-[#ffb830] leading-relaxed font-medium">
+                      {lang === 'id' 
+                        ? '⚠️ Peringatan: Respons AI mungkin mengandung kesalahan. Selalu hubungi layanan medis (Klinik atau 112) untuk keadaan darurat.' 
+                        : '⚠️ Disclaimer: AI responses may contain errors. Always contact medical services (Clinic or 112) for emergencies.'}
+                    </p>
+                  </div>
+
                   <form onSubmit={handleAiSubmit} className="p-3 bg-white/5 border-t border-white/5 flex gap-2">
                     <input 
                       type="text"
@@ -1561,21 +1704,77 @@ export default function GiliGuard() {
               </div>
 
               {!infoSubPage ? (
-                /* Main Menu List */
-                <div className="space-y-3">
-                  {[
-                    { id: 'peta', label: t('lbl_peta'), icon: MapPin, color: 'text-[#3d9bff]' },
+                <div className="space-y-6">
+                  {/* User Profile Section */}
+                  <div className="bg-[#121f35] border border-white/5 rounded-2xl p-5">
+                    {user ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          {user.photoURL ? (
+                            <Image 
+                              src={user.photoURL} 
+                              alt="Profile" 
+                              width={48} 
+                              height={48} 
+                              className="rounded-full border border-white/10"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-[#3d9bff]/20 text-[#3d9bff] flex items-center justify-center text-lg font-bold">
+                              {user.displayName?.charAt(0) || user.email?.charAt(0) || '?'}
+                            </div>
+                          )}
+                          <div>
+                            <div className="text-sm font-bold text-white tracking-tight">{user.displayName || 'User'}</div>
+                            <div className="text-[10px] text-[#7a9ab8]">{user.email}</div>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={handleLogout}
+                          className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-[#ff3c3c] hover:bg-[#ff3c3c]/10 transition-colors active:scale-95"
+                        >
+                          <LogOut className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-bold text-white tracking-tight">{lang === 'id' ? 'Belum Masuk' : 'Not Signed In'}</div>
+                          <div className="text-[10px] text-[#7a9ab8]">{lang === 'id' ? 'Masuk untuk fitur lengkap' : 'Sign in for full features'}</div>
+                        </div>
+                        <button 
+                          onClick={handleGoogleLogin}
+                          className="bg-[#3d9bff] text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-[#3d9bff]/20 active:scale-95 transition-all flex items-center gap-2"
+                        >
+                          <Image src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width={14} height={14} alt="Google" />
+                          {lang === 'id' ? 'Masuk' : 'Sign In'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Main Menu List */}
+                  <div className="space-y-3">
+                    {[
+                      { id: 'peta', label: t('lbl_peta'), icon: MapPin, color: 'text-[#3d9bff]' },
                     { id: 'settings', label: t('lbl_settings'), icon: Settings, color: 'text-[#3d9bff]' },
                     { id: 'hist', label: t('lbl_hist'), icon: AlertCircle, color: 'text-[#ff3c3c]' },
                     { id: 'rules', label: t('lbl_rules'), icon: Shield, color: 'text-[#ffb800]' },
                     { id: 'links', label: t('lbl_links'), icon: ExternalLink, color: 'text-[#00e5b0]' },
                     { id: 'about', label: t('lbl_about'), icon: Info, color: 'text-[#3d9bff]' },
                     { id: 'dev', label: t('lbl_dev'), icon: Smartphone, color: 'text-[#ddeeff]' },
+                    { id: 'feedback', label: t('lbl_feedback'), icon: MessageSquare, color: 'text-[#ffb830]' },
                     { id: 'legal', label: t('lbl_legal'), icon: Shield, color: 'text-[#7a9ab8]' },
                   ].map((item) => (
                     <button
                       key={item.id}
-                      onClick={() => setInfoSubPage(item.id)}
+                      onClick={() => {
+                        if (item.id === 'peta') {
+                          setActivePage('peta');
+                        } else {
+                          setInfoSubPage(item.id);
+                        }
+                      }}
                       className="w-full bg-[#121f35] border border-white/5 rounded-2xl p-4 flex items-center justify-between group hover:bg-white/5 transition-all active:scale-[0.98]"
                     >
                       <div className="flex items-center gap-4">
@@ -1594,6 +1793,7 @@ export default function GiliGuard() {
                     <div className="text-[10px] text-[#3d6080] font-black uppercase tracking-widest mb-1">{t('about_dev')}</div>
                     <div className="text-[9px] text-[#3d6080] italic opacity-60">{t('mission')}</div>
                   </div>
+                </div>
                 </div>
               ) : (
                 /* Sub Pages Content */
@@ -1624,6 +1824,36 @@ export default function GiliGuard() {
                               <span className="text-2xl">{l.flag}</span>
                               <span className="text-[10px] font-bold uppercase tracking-widest">{l.label}</span>
                             </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-[#121f35] border border-white/5 rounded-2xl p-5">
+                        <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-4 font-mono">⚙️ {t('lbl_app_settings')}</div>
+                        <div className="space-y-4">
+                          {[
+                            { id: 'notifications', label: t('lbl_notif'), icon: '🔔' },
+                            { id: 'location', label: t('lbl_loc'), icon: '📍' },
+                            { id: 'dataSaver', label: t('lbl_data'), icon: '📶' }
+                          ].map((setting) => (
+                            <div key={setting.id} className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <span className="text-lg">{setting.icon}</span>
+                                <span className="text-xs font-bold text-white">{setting.label}</span>
+                              </div>
+                              <button
+                                onClick={() => setAppSettings(prev => ({ ...prev, [setting.id]: !prev[setting.id as keyof typeof prev] }))}
+                                className={cn(
+                                  "w-12 h-6 rounded-full transition-colors relative",
+                                  appSettings[setting.id as keyof typeof appSettings] ? "bg-[#00e5b0]" : "bg-white/10"
+                                )}
+                              >
+                                <div className={cn(
+                                  "w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform",
+                                  appSettings[setting.id as keyof typeof appSettings] ? "translate-x-6.5" : "translate-x-0.5"
+                                )} />
+                              </button>
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -1739,6 +1969,38 @@ export default function GiliGuard() {
                               <social.icon className="w-5 h-5" />
                             </button>
                           ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {infoSubPage === 'feedback' && (
+                    <div className="space-y-4">
+                      <div className="bg-[#121f35] border border-white/5 rounded-2xl p-6 text-center">
+                        <div className="w-16 h-16 rounded-full bg-[#ffb830]/10 flex items-center justify-center mx-auto mb-4">
+                          <MessageSquare className="w-8 h-8 text-[#ffb830]" />
+                        </div>
+                        <h3 className="text-lg font-bold text-white mb-2">{t('lbl_feedback')}</h3>
+                        <p className="text-xs text-[#7a9ab8] leading-relaxed mb-6">
+                          {t('feedback_desc')}
+                        </p>
+                        
+                        <div className="space-y-3">
+                          <button 
+                            onClick={() => window.open('mailto:zohidydy@gmail.com?subject=GiliGuard%20Feedback', '_blank')}
+                            className="w-full bg-[#3d9bff] text-white font-bold py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 hover:bg-[#3d9bff]/90 transition-colors active:scale-[0.98]"
+                          >
+                            <Mail className="w-4 h-4" />
+                            {t('feedback_btn')}
+                          </button>
+                          
+                          <button 
+                            onClick={() => window.open('https://wa.me/6285293514808?text=Halo%20Zohidy,%20saya%20punya%20masukan%20untuk%20GiliGuard...', '_blank')}
+                            className="w-full bg-[#00e5b0] text-[#080f1e] font-bold py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 hover:bg-[#00e5b0]/90 transition-colors active:scale-[0.98]"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            {t('feedback_btn_wa')}
+                          </button>
                         </div>
                       </div>
                     </div>
