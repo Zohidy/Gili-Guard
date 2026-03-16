@@ -18,7 +18,7 @@ import { db, auth } from '@/lib/firebase';
 import { 
   collection, addDoc, onSnapshot, query, 
   orderBy, serverTimestamp, deleteDoc, doc,
-  Timestamp 
+  Timestamp, updateDoc, arrayUnion
 } from 'firebase/firestore';
 import { 
   signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, signOut 
@@ -28,6 +28,14 @@ import {
 type Lang = 'id' | 'en';
 type Page = 'beranda' | 'kontak' | 'p3k' | 'peta' | 'info' | 'lostfound';
 
+interface CommentItem {
+  id: string;
+  text: string;
+  authorName: string;
+  authorUid: string;
+  createdAt: number;
+}
+
 interface LostFoundItem {
   id: string;
   type: 'lost' | 'found';
@@ -35,9 +43,12 @@ interface LostFoundItem {
   description: string;
   location: string;
   contact: string;
+  timeLost?: string;
+  image?: string;
   createdAt: any;
   status: 'active' | 'resolved';
   uid: string;
+  comments?: CommentItem[];
 }
 
 interface WeatherData {
@@ -96,6 +107,8 @@ const STRINGS = {
   lf_item_desc: { id: 'Deskripsi (Warna, Ciri khas)', en: 'Description (Color, Features)' },
   lf_item_loc: { id: 'Lokasi (Terakhir dilihat/ditemukan)', en: 'Location (Last seen/found)' },
   lf_item_contact: { id: 'Kontak (WA/Telepon)', en: 'Contact (WA/Phone)' },
+  lf_time: { id: 'Waktu Kejadian', en: 'Time of Incident' },
+  lf_image: { id: 'Foto Barang (Opsional)', en: 'Item Photo (Optional)' },
   lf_submit: { id: 'KIRIM LAPORAN', en: 'SUBMIT REPORT' },
   lf_success: { id: 'Laporan berhasil dikirim!', en: 'Report submitted successfully!' },
   lf_delete_confirm: { id: 'Hapus laporan ini?', en: 'Delete this report?' },
@@ -459,6 +472,7 @@ export default function GiliGuard() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [p3kSearch, setP3kSearch] = useState('');
+  const [completedTasks, setCompletedTasks] = useState<string[]>([]);
   const [mapQuery, setMapQuery] = useState('');
 
   // AI Chat state
@@ -493,17 +507,98 @@ export default function GiliGuard() {
     title: '',
     description: '',
     location: '',
-    contact: ''
+    contact: '',
+    timeLost: '',
+    image: ''
   });
+  const [commentInputs, setCommentInputs] = useState<{[key: string]: string}>({});
+  const [expandedComments, setExpandedComments] = useState<{[key: string]: boolean}>({});
+  const [toast, setToast] = useState<{show: boolean, message: string, type: 'success' | 'error' | 'info'}>({show: false, message: '', type: 'success'});
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({show: true, message, type});
+    setTimeout(() => setToast(prev => ({...prev, show: false})), 3000);
+  }, []);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast(lang === 'id' ? 'Ukuran gambar maksimal 5MB' : 'Max image size is 5MB', 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Compress to JPEG with 0.7 quality
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        setNewLf(prev => ({ ...prev, image: dataUrl }));
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Auth setup
   useEffect(() => {
     setMounted(true);
+    
+    // Load persisted data
+    if (typeof window !== 'undefined') {
+      const savedLang = localStorage.getItem('gili_lang');
+      if (savedLang) setLang(savedLang as Lang);
+
+      const savedSettings = localStorage.getItem('gili_settings');
+      if (savedSettings) setAppSettings(JSON.parse(savedSettings));
+
+      const savedHistory = localStorage.getItem('gili_history');
+      if (savedHistory) setHistory(JSON.parse(savedHistory));
+    }
+
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
     });
     return unsub;
   }, []);
+
+  // Persist data when changed
+  useEffect(() => {
+    if (mounted) localStorage.setItem('gili_lang', lang);
+  }, [lang, mounted]);
+
+  useEffect(() => {
+    if (mounted) localStorage.setItem('gili_settings', JSON.stringify(appSettings));
+  }, [appSettings, mounted]);
+
+  useEffect(() => {
+    if (mounted) localStorage.setItem('gili_history', JSON.stringify(history));
+  }, [history, mounted]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -556,10 +651,11 @@ export default function GiliGuard() {
         uid: user.uid
       });
       setShowLfForm(false);
-      setNewLf({ type: 'lost', title: '', description: '', location: '', contact: '' });
-      alert(t('lf_success'));
+      setNewLf({ type: 'lost', title: '', description: '', location: '', contact: '', timeLost: '', image: '' });
+      showToast(t('lf_success'), 'success');
     } catch (error) {
       console.error("Error adding document: ", error);
+      showToast(lang === 'id' ? 'Gagal memposting' : 'Failed to post', 'error');
     }
   };
 
@@ -567,9 +663,40 @@ export default function GiliGuard() {
     if (confirm(t('lf_delete_confirm'))) {
       try {
         await deleteDoc(doc(db, 'lost_and_found', id));
+        showToast(lang === 'id' ? 'Berhasil dihapus' : 'Successfully deleted', 'success');
       } catch (error) {
         console.error("Error deleting document: ", error);
+        showToast(lang === 'id' ? 'Gagal menghapus' : 'Failed to delete', 'error');
       }
+    }
+  };
+
+  const handleAddComment = async (itemId: string) => {
+    if (!user) {
+      showToast(lang === 'id' ? 'Silakan masuk untuk berkomentar' : 'Please sign in to comment', 'error');
+      return;
+    }
+    const text = commentInputs[itemId]?.trim();
+    if (!text) return;
+
+    try {
+      const newComment: CommentItem = {
+        id: Date.now().toString(),
+        text,
+        authorName: user.displayName || user.email?.split('@')[0] || 'User',
+        authorUid: user.uid,
+        createdAt: Date.now()
+      };
+      
+      await updateDoc(doc(db, 'lost_and_found', itemId), {
+        comments: arrayUnion(newComment)
+      });
+      
+      setCommentInputs(prev => ({...prev, [itemId]: ''}));
+      showToast(lang === 'id' ? 'Komentar ditambahkan' : 'Comment added', 'success');
+    } catch (error) {
+      console.error("Error adding comment: ", error);
+      showToast(lang === 'id' ? 'Gagal menambahkan komentar' : 'Failed to add comment', 'error');
     }
   };
 
@@ -1016,24 +1143,51 @@ export default function GiliGuard() {
                   </button>
                 </div>
                 <div className="space-y-3">
-                  {lfItems.length > 0 ? (
-                    lfItems.slice(0, 2).map((item) => (
-                      <div key={item.id} className="bg-[#121f35]/40 border border-white/5 rounded-2xl p-4 flex items-center gap-4">
+                  {lfItems.filter(item => {
+                    const matchesFilter = lfFilter === 'all' || item.type === lfFilter;
+                    const matchesSearch = item.title.toLowerCase().includes(lfSearch.toLowerCase()) || 
+                                         item.description.toLowerCase().includes(lfSearch.toLowerCase());
+                    return matchesFilter && matchesSearch;
+                  }).length > 0 ? (
+                    lfItems.filter(item => {
+                      const matchesFilter = lfFilter === 'all' || item.type === lfFilter;
+                      const matchesSearch = item.title.toLowerCase().includes(lfSearch.toLowerCase()) || 
+                                           item.description.toLowerCase().includes(lfSearch.toLowerCase());
+                      return matchesFilter && matchesSearch;
+                    }).slice(0, 2).map((item) => (
+                      <div key={item.id} className="bg-[#121f35] border border-white/5 rounded-2xl overflow-hidden relative group">
                         <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center text-lg",
-                          item.type === 'lost' ? "bg-red-500/10 text-red-500" : "bg-emerald-500/10 text-emerald-500"
-                        )}>
-                          {item.type === 'lost' ? '❓' : '🎁'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-bold text-white truncate uppercase tracking-tight">{item.title}</div>
-                          <div className="text-[10px] text-[#7a9ab8] truncate">{item.location}</div>
-                        </div>
-                        <div className={cn(
-                          "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest",
-                          item.type === 'lost' ? "bg-red-500/20 text-red-400" : "bg-emerald-500/20 text-emerald-400"
-                        )}>
-                          {item.type === 'lost' ? t('lf_lost') : t('lf_found')}
+                          "absolute top-0 left-0 w-1 h-full",
+                          item.type === 'lost' ? "bg-[#ff3c3c]" : "bg-[#00e5b0]"
+                        )} />
+                        <div className="p-3">
+                          <div className="flex gap-3">
+                            {item.image && (
+                              <div className="w-16 h-16 rounded-xl overflow-hidden relative shrink-0 border border-white/10">
+                                <Image src={item.image} alt={item.title} fill className="object-cover" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between mb-1">
+                                <div className={cn(
+                                  "text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest",
+                                  item.type === 'lost' ? "bg-[#ff3c3c]/10 text-[#ff3c3c]" : "bg-[#00e5b0]/10 text-[#00e5b0]"
+                                )}>
+                                  {item.type === 'lost' ? t('lf_lost') : t('lf_found')}
+                                </div>
+                              </div>
+                              <h3 className="text-xs font-black text-white mb-1 uppercase tracking-tight truncate">{item.title}</h3>
+                              {item.timeLost && (
+                                <div className="text-[8px] text-[#ffb830] font-medium mb-1">
+                                  🕒 {new Date(item.timeLost).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US', { dateStyle: 'short', timeStyle: 'short' })}
+                                </div>
+                              )}
+                              <div className="flex items-center gap-1.5">
+                                <MapPin className="w-3 h-3 text-[#3d9bff] shrink-0" />
+                                <span className="text-[9px] text-[#7a9ab8] font-bold truncate">{item.location}</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))
@@ -1327,14 +1481,48 @@ export default function GiliGuard() {
                             </div>
                           </div>
                         </div>
-                        <div className="p-4 space-y-3">
-                          {guide.steps.map((step, i) => (
-                            <div key={step.id} className="flex gap-3">
-                              <div className="w-5 h-5 rounded-full bg-[#18284a] border border-white/10 flex items-center justify-center text-[10px] font-bold shrink-0">{i+1}</div>
-                              <div className="text-[11px] text-[#7a9ab8] leading-relaxed">{step.text[lang]}</div>
-                            </div>
-                          ))}
-                          <div className="bg-[#ffb830]/5 border border-[#ffb830]/20 rounded-xl p-3 text-[10px] text-[#ffb830] flex gap-2">
+                        <div className="p-4 space-y-2">
+                          {guide.steps.map((step, i) => {
+                            const isCompleted = completedTasks.includes(step.id);
+                            return (
+                              <motion.div 
+                                key={step.id} 
+                                className={cn(
+                                  "flex gap-3 cursor-pointer p-2 rounded-xl transition-colors",
+                                  isCompleted ? "bg-[#00e5b0]/5" : "hover:bg-white/5"
+                                )}
+                                onClick={() => {
+                                  setCompletedTasks(prev => 
+                                    prev.includes(step.id) 
+                                      ? prev.filter(id => id !== step.id)
+                                      : [...prev, step.id]
+                                  );
+                                }}
+                                layout
+                              >
+                                <motion.div 
+                                  className={cn(
+                                    "w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors",
+                                    isCompleted ? "bg-[#00e5b0] border-[#00e5b0] text-[#080f1e]" : "bg-[#18284a] border-white/10 text-white"
+                                  )}
+                                  animate={isCompleted ? { scale: [1, 1.2, 1] } : { scale: 1 }}
+                                  transition={{ duration: 0.3 }}
+                                >
+                                  {isCompleted ? <CheckCircle2 className="w-3 h-3" /> : i+1}
+                                </motion.div>
+                                <motion.div 
+                                  className={cn(
+                                    "text-[11px] leading-relaxed transition-all",
+                                    isCompleted ? "text-[#00e5b0]/70 line-through" : "text-[#7a9ab8]"
+                                  )}
+                                  animate={isCompleted ? { opacity: 0.7 } : { opacity: 1 }}
+                                >
+                                  {step.text[lang]}
+                                </motion.div>
+                              </motion.div>
+                            );
+                          })}
+                          <div className="bg-[#ffb830]/5 border border-[#ffb830]/20 rounded-xl p-3 text-[10px] text-[#ffb830] flex gap-2 mt-2">
                             <span>⚠️</span>
                             {guide.warning[lang]}
                           </div>
@@ -1536,36 +1724,104 @@ export default function GiliGuard() {
                         "absolute top-0 left-0 w-1 h-full",
                         item.type === 'lost' ? "bg-[#ff3c3c]" : "bg-[#00e5b0]"
                       )} />
-                      <div className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className={cn(
-                            "text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest",
-                            item.type === 'lost' ? "bg-[#ff3c3c]/10 text-[#ff3c3c]" : "bg-[#00e5b0]/10 text-[#00e5b0]"
-                          )}>
-                            {item.type === 'lost' ? t('lf_lost') : t('lf_found')}
-                          </div>
-                          {user?.uid === item.uid && (
-                            <button 
-                              onClick={() => deleteLfItem(item.id)}
-                              className="p-1.5 text-[#ff3c3c] hover:bg-[#ff3c3c]/10 rounded-lg transition-all"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                      <div className="p-3">
+                        <div className="flex gap-3">
+                          {item.image && (
+                            <div className="w-20 h-20 rounded-xl overflow-hidden relative shrink-0 border border-white/10">
+                              <Image src={item.image} alt={item.title} fill className="object-cover" />
+                            </div>
                           )}
-                        </div>
-                        <h3 className="text-sm font-black text-white mb-1 uppercase tracking-tight">{item.title}</h3>
-                        <p className="text-[11px] text-[#7a9ab8] leading-relaxed mb-3">{item.description}</p>
-                        
-                        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/5">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-3 h-3 text-[#3d9bff]" />
-                            <span className="text-[10px] text-[#7a9ab8] font-bold truncate">{item.location}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between mb-1">
+                              <div className={cn(
+                                "text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest",
+                                item.type === 'lost' ? "bg-[#ff3c3c]/10 text-[#ff3c3c]" : "bg-[#00e5b0]/10 text-[#00e5b0]"
+                              )}>
+                                {item.type === 'lost' ? t('lf_lost') : t('lf_found')}
+                              </div>
+                              {user?.uid === item.uid && (
+                                <button 
+                                  onClick={() => deleteLfItem(item.id)}
+                                  className="p-1 text-[#ff3c3c] hover:bg-[#ff3c3c]/10 rounded-lg transition-all"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                            <h3 className="text-sm font-black text-white mb-1 uppercase tracking-tight truncate">{item.title}</h3>
+                            {item.timeLost && (
+                              <div className="text-[9px] text-[#ffb830] font-medium mb-1">
+                                🕒 {new Date(item.timeLost).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <MapPin className="w-3 h-3 text-[#3d9bff] shrink-0" />
+                              <span className="text-[10px] text-[#7a9ab8] font-bold truncate">{item.location}</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <MessageSquare className="w-3 h-3 text-[#00e5b0]" />
-                            <span className="text-[10px] text-[#7a9ab8] font-bold truncate">{item.contact}</span>
-                          </div>
                         </div>
+
+                        {expandedComments[item.id] && (
+                          <div className="mt-3 pt-3 border-t border-white/5">
+                            <p className="text-[11px] text-[#7a9ab8] leading-relaxed mb-3">{item.description}</p>
+                            <div className="flex items-center gap-2 mb-4">
+                              <MessageSquare className="w-3 h-3 text-[#00e5b0]" />
+                              <span className="text-[10px] text-[#7a9ab8] font-bold truncate">{item.contact}</span>
+                            </div>
+
+                            {/* Comments Section */}
+                            <div className="space-y-2 mb-3">
+                              {item.comments?.map(comment => (
+                                <div key={comment.id} className="bg-white/5 rounded-xl p-2.5">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[9px] font-bold text-white">{comment.authorName}</span>
+                                    <span className="text-[8px] text-[#7a9ab8]">
+                                      {new Date(comment.createdAt).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-[#7a9ab8] leading-relaxed">{comment.text}</p>
+                                </div>
+                              ))}
+                            </div>
+                            
+                            {user ? (
+                              <div className="flex gap-2">
+                                <input 
+                                  type="text"
+                                  value={commentInputs[item.id] || ''}
+                                  onChange={e => setCommentInputs(prev => ({...prev, [item.id]: e.target.value}))}
+                                  placeholder={lang === 'id' ? 'Tulis komentar...' : 'Write a comment...'}
+                                  className="flex-1 bg-[#080f1e] border border-white/10 rounded-xl px-3 py-2 text-[10px] text-white placeholder-[#3d6080] focus:outline-none focus:border-[#3d9bff]/50"
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleAddComment(item.id);
+                                    }
+                                  }}
+                                />
+                                <button 
+                                  onClick={() => handleAddComment(item.id)}
+                                  disabled={!commentInputs[item.id]?.trim()}
+                                  className="w-8 h-8 rounded-xl bg-[#3d9bff] text-white flex items-center justify-center disabled:opacity-50"
+                                >
+                                  <Navigation className="w-3 h-3 rotate-90" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="text-center text-[9px] text-[#3d6080]">
+                                {lang === 'id' ? 'Masuk untuk berkomentar' : 'Sign in to comment'}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <button 
+                          onClick={() => setExpandedComments(prev => ({...prev, [item.id]: !prev[item.id]}))}
+                          className="w-full mt-2 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-[9px] font-bold text-[#7a9ab8] uppercase tracking-widest transition-colors flex items-center justify-center gap-1"
+                        >
+                          {expandedComments[item.id] ? (lang === 'id' ? 'Tutup Detail' : 'Close Details') : (lang === 'id' ? 'Lihat Detail & Komentar' : 'View Details & Comments')}
+                          {!expandedComments[item.id] && item.comments && item.comments.length > 0 && ` (${item.comments.length})`}
+                        </button>
                       </div>
                     </motion.div>
                   ))}
@@ -1654,6 +1910,42 @@ export default function GiliGuard() {
                             className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-[#3d9bff] outline-none transition-all"
                             placeholder="e.g. +62 812..."
                           />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-black text-[#3d6080] uppercase tracking-widest mb-2 block">{t('lf_time')}</label>
+                          <input 
+                            type="datetime-local"
+                            value={newLf.timeLost}
+                            onChange={e => setNewLf({...newLf, timeLost: e.target.value})}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-[#3d9bff] outline-none transition-all [color-scheme:dark]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-black text-[#3d6080] uppercase tracking-widest mb-2 block">{t('lf_image')}</label>
+                          <div className="relative w-full bg-white/5 border border-dashed border-white/20 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:border-[#3d9bff]/50 transition-colors cursor-pointer">
+                            <input 
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageUpload}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            />
+                            {newLf.image ? (
+                              <div className="relative w-full h-32 rounded-lg overflow-hidden">
+                                <Image src={newLf.image} alt="Preview" fill className="object-cover" />
+                              </div>
+                            ) : (
+                              <>
+                                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                                  <span className="text-xl">📷</span>
+                                </div>
+                                <span className="text-[10px] text-[#7a9ab8] font-bold uppercase tracking-wider">
+                                  {lang === 'id' ? 'Pilih Foto' : 'Choose Photo'}
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
 
                         <div className="pt-4">
@@ -1802,6 +2094,25 @@ export default function GiliGuard() {
                   animate={{ opacity: 1, x: 0 }}
                   className="space-y-6"
                 >
+                  {infoSubPage === 'peta' && (
+                    <div className="space-y-4">
+                      <div className="bg-[#121f35] border border-white/5 rounded-2xl p-4">
+                        <div className="text-[10px] font-bold text-[#3d6080] uppercase tracking-widest mb-4 font-mono">🗺️ {t('lbl_peta')}</div>
+                        <div className="w-full h-[400px] rounded-xl overflow-hidden border border-white/5">
+                          <iframe 
+                            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15783.33614059483!2d116.027961!3d-8.3503!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2dcdb09432095905%3A0x5030bfbca832260!2sGili%20Trawangan!5e0!3m2!1sen!2sid!4v1710543210987!5m2!1sen!2sid" 
+                            width="100%" 
+                            height="100%" 
+                            style={{ border: 0 }} 
+                            allowFullScreen 
+                            loading="lazy" 
+                            referrerPolicy="no-referrer-when-downgrade"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {infoSubPage === 'settings' && (
                     <div className="space-y-6">
                       <div className="bg-[#121f35] border border-white/5 rounded-2xl p-5">
@@ -2209,6 +2520,30 @@ export default function GiliGuard() {
               <button onClick={() => setShowInstallPrompt(false)} className="text-[#3d6080] hover:text-white">
                 <X className="w-4 h-4" />
               </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast.show && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: 50, x: '-50%' }}
+            className="fixed bottom-24 left-1/2 z-[300] pointer-events-none"
+          >
+            <div className={cn(
+              "px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border backdrop-blur-md",
+              toast.type === 'success' ? "bg-[#00e5b0]/20 border-[#00e5b0]/50 text-[#00e5b0]" : 
+              toast.type === 'error' ? "bg-[#ff3c3c]/20 border-[#ff3c3c]/50 text-[#ff3c3c]" : 
+              "bg-[#3d9bff]/20 border-[#3d9bff]/50 text-[#3d9bff]"
+            )}>
+              {toast.type === 'success' && <CheckCircle2 className="w-5 h-5" />}
+              {toast.type === 'error' && <AlertCircle className="w-5 h-5" />}
+              {toast.type === 'info' && <Info className="w-5 h-5" />}
+              <span className="text-xs font-bold tracking-wide whitespace-nowrap">{toast.message}</span>
             </div>
           </motion.div>
         )}
