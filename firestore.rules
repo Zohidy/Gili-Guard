@@ -6,16 +6,23 @@ service cloud.firestore {
     // ===============================================================
     //
     // Collection: lost_and_found
-    // Document ID: itemId
     // Fields:
     //   - type: string ("lost" | "found")
-    //   - title: string
-    //   - description: string
-    //   - location: string
-    //   - contact: string
-    //   - createdAt: string (ISO 8601)
+    //   - title: string (1-100 chars)
+    //   - description: string (1-1000 chars)
+    //   - location: string (1-200 chars)
+    //   - contact: string (1-200 chars)
     //   - status: string ("active" | "resolved")
     //   - uid: string
+    //   - createdAt: timestamp
+    //
+    // Collection: sos_alerts
+    // Fields:
+    //   - uid: string | null
+    //   - userName: string
+    //   - coords: string
+    //   - timestamp: timestamp
+    //   - status: string ("active" | "resolved")
     //
     // ===============================================================
 
@@ -26,6 +33,13 @@ service cloud.firestore {
 
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == "zohidydy@gmail.com" && 
+        request.auth.token.email_verified == true
+      );
     }
 
     function isValidItem(data) {
@@ -39,20 +53,31 @@ service cloud.firestore {
              data.createdAt is timestamp;
     }
 
+    function isValidSOSAlert(data) {
+      return data.userName is string && data.userName.size() > 0 &&
+             data.coords is string && data.coords.size() > 0 &&
+             data.status in ['active', 'resolved'] &&
+             data.timestamp is timestamp;
+    }
+
     match /lost_and_found/{itemId} {
-      allow read: if true; // Publicly readable
+      allow read: if true;
       allow create: if isAuthenticated() && 
                       isValidItem(request.resource.data) && 
-                      request.resource.data.uid == request.auth.uid &&
-                      request.resource.data.status == 'active';
-      allow update: if isOwner(resource.data.uid) && 
-                      isValidItem(request.resource.data) &&
-                      request.resource.data.uid == resource.data.uid;
-      allow delete: if isOwner(resource.data.uid);
+                      request.resource.data.uid == request.auth.uid;
+      allow update: if (isOwner(resource.data.uid) || isAdmin()) && 
+                      isValidItem(request.resource.data);
+      allow delete: if isOwner(resource.data.uid) || isAdmin();
+    }
+
+    match /sos_alerts/{alertId} {
+      allow read: if isAdmin();
+      allow create: if isValidSOSAlert(request.resource.data);
+      allow update, delete: if isAdmin();
     }
 
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if isOwner(userId) || isAdmin();
     }
   }
 }

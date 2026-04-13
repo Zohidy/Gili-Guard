@@ -3,28 +3,29 @@
 
 @theme {
   --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
   --font-mono: var(--font-mono);
 }
 
 :root {
-  --bg: #080f1e;
-  --bg2: #0d1829;
-  --bg3: #121f35;
-  --surface: #18284a;
-  --surface2: #1e3258;
-  --border: rgba(255, 255, 255, 0.07);
-  --border2: rgba(255, 255, 255, 0.13);
-  --text: #ddeeff;
-  --text2: #7a9ab8;
-  --text3: #3d6080;
-  --red: #ff3c3c;
-  --red2: #c81a1a;
-  --red-glow: rgba(255, 60, 60, 0.28);
-  --teal: #00e5b0;
-  --blue: #3d9bff;
-  --amber: #ffb830;
-  --green: #3ecf80;
-  --orange: #ff7c35;
+  --bg: #050505;
+  --bg2: #111111;
+  --bg3: #1a1a1a;
+  --surface: #111111;
+  --surface2: #1a1a1a;
+  --border: rgba(255, 255, 255, 0.1);
+  --border2: rgba(255, 255, 255, 0.2);
+  --text: #ffffff;
+  --text2: #a1a1aa;
+  --text3: #52525b;
+  --red: #FF4444;
+  --red2: #CC0000;
+  --red-glow: rgba(255, 68, 68, 0.3);
+  --teal: #00E5FF;
+  --blue: #0066FF;
+  --amber: #FFB800;
+  --green: #00FF00;
+  --orange: #FF6321;
 }
 
 body {
@@ -35,8 +36,9 @@ body {
 
 @layer utilities {
   .bg-glass {
-    background: rgba(13, 24, 41, 0.8);
-    backdrop-filter: blur(12px);
+    background: rgba(17, 17, 17, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
   .animate-gradient-x {
     background-size: 200% 200%;
@@ -48,11 +50,14 @@ body {
   .animate-glow {
     animation: glow 2s ease-in-out infinite alternate;
   }
+  .font-display {
+    font-family: var(--font-display);
+  }
 }
 
 @keyframes glow {
-  from { box-shadow: 0 0 10px -5px rgba(255, 60, 60, 0.5); }
-  to { box-shadow: 0 0 20px 5px rgba(255, 60, 60, 0.8); }
+  from { box-shadow: 0 0 10px -5px rgba(255, 68, 68, 0.5); }
+  to { box-shadow: 0 0 20px 5px rgba(255, 68, 68, 0.8); }
 }
 
 @keyframes gradient-x {

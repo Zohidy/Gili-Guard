@@ -2,9 +2,7 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  turbopack: {},
   typescript: {
     ignoreBuildErrors: false,
   },
@@ -26,6 +24,12 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'www.gstatic.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'storage.ko-fi.com',
         port: '',
         pathname: '/**',
       }

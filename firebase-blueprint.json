@@ -16,12 +16,29 @@
         "uid": { "type": "string", "description": "User ID of the reporter" }
       },
       "required": ["type", "title", "description", "location", "contact", "createdAt", "status", "uid"]
+    },
+    "SOSAlert": {
+      "title": "SOS Alert",
+      "description": "An emergency alert sent by a user",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User ID of the sender" },
+        "userName": { "type": "string", "description": "Name of the sender" },
+        "coords": { "type": "string", "description": "GPS coordinates" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the alert was sent" },
+        "status": { "type": "string", "enum": ["active", "resolved"], "description": "Current status of the alert" }
+      },
+      "required": ["coords", "timestamp", "status"]
     }
   },
   "firestore": {
     "/lost_and_found/{itemId}": {
       "schema": "LostAndFoundItem",
       "description": "Collection of lost and found items"
+    },
+    "/sos_alerts/{alertId}": {
+      "schema": "SOSAlert",
+      "description": "Collection of emergency SOS alerts"
     }
   }
 }

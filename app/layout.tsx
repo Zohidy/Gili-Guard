@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Space_Grotesk, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 
@@ -8,11 +8,21 @@ const inter = Inter({
   variable: '--font-sans',
 });
 
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-display',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-mono',
+});
+
 export const metadata: Metadata = {
   title: 'Gili Guard - Emergency App',
   description: 'Emergency assistance for Gili Trawangan',
   manifest: '/manifest.json',
-  themeColor: '#ff3c3c',
+  themeColor: '#FF4444',
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0',
   appleWebApp: {
     capable: true,
@@ -27,8 +37,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" className={`${inter.variable}`}>
-      <body className="font-sans antialiased bg-stone-50 text-stone-900" suppressHydrationWarning>
+    <html lang="id" className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
+      <body className="font-sans antialiased bg-black text-white" suppressHydrationWarning>
         <ServiceWorkerRegister />
         {children}
       </body>

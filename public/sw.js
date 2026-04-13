@@ -1,14 +1,18 @@
-const CACHE_NAME = 'giliguard-cache-v1';
+const CACHE_NAME = 'giliguard-cache-v2';
+const OFFLINE_URL = '/';
+
+const PRECACHE_ASSETS = [
+  '/',
+  '/manifest.json',
+  '/api/icon?size=192',
+  '/api/icon?size=512',
+  '/favicon.ico'
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([
-        '/',
-        '/manifest.json',
-        '/api/icon?size=192',
-        '/api/icon?size=512'
-      ]);
+      return cache.addAll(PRECACHE_ASSETS);
     })
   );
   self.skipWaiting();
@@ -30,44 +34,45 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Skip cross-origin requests
-  if (!event.request.url.startsWith(self.location.origin)) return;
+  if (event.request.method !== 'GET') return;
+
+  // Skip cross-origin requests unless they are specific CDNs we use
+  const isInternal = event.request.url.startsWith(self.location.origin);
+  const isCdn = event.request.url.includes('picsum.photos') || 
+                event.request.url.includes('google-analytics.com') ||
+                event.request.url.includes('lucide-react') ||
+                event.request.url.includes('fonts.googleapis.com') ||
+                event.request.url.includes('fonts.gstatic.com') ||
+                event.request.url.includes('gstatic.com');
+
+  if (!isInternal && !isCdn) return;
   
-  // Skip API requests (except our icon)
-  if (event.request.url.includes('/api/') && !event.request.url.includes('/api/icon')) return;
+  // Skip Firebase and other dynamic APIs
+  if (event.request.url.includes('firestore.googleapis.com') || 
+      event.request.url.includes('identitytoolkit.googleapis.com') ||
+      event.request.url.includes('googletagmanager.com')) return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Return cached response, but fetch network in background to update cache (stale-while-revalidate)
-        event.waitUntil(
-          fetch(event.request).then((networkResponse) => {
-            if (networkResponse.ok) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, networkResponse.clone());
-              });
-            }
-          }).catch(() => {})
-        );
-        return cachedResponse;
-      }
-
-      // If not in cache, fetch from network
-      return fetch(event.request).then((networkResponse) => {
-        // Cache the new response for future
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+      const fetchPromise = fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
           });
         }
         return networkResponse;
-      }).catch(() => {
-        // If network fails and it's a navigation request, return the cached root
+      }).catch((error) => {
+        if (cachedResponse) return cachedResponse;
+        
+        // If both fail and it's a navigation, return offline page (root)
         if (event.request.mode === 'navigate') {
-          return caches.match('/');
+          return caches.match(OFFLINE_URL);
         }
+        throw error;
       });
+
+      return cachedResponse || fetchPromise;
     })
   );
 });
